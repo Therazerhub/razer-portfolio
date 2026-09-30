@@ -1,0 +1,2561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RAZER — Computer Engineering Student · Developer · Builder</title>
+<meta name="description" content="The digital world of RAZER — a computer engineering student who builds software, experiments with Linux, automation, AI and web technologies. Rendered live in WebGL.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050505'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23e0231c' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%23e0231c'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="razer-assets/fonts.css">
+<style>
+/* ============================================================= tokens */
+:root{
+  --ink:#050505;          /* page black */
+  --ink-2:#0b0b0d;        /* raised black */
+  --bone:#f5f5f5;         /* primary text */
+  --bone-dim:#c9cccf;
+  --muted:#8a8a8a;        /* secondary text */
+  --line:rgba(245,245,245,.12);
+  --line-soft:rgba(245,245,245,.06);
+  --accent:#e0231c;       /* the one red */
+  --pad:clamp(20px, 3.4vw, 56px);
+  --nav-h:84px;
+  --ease:cubic-bezier(.22,.61,.36,1);
+  --ease-out:cubic-bezier(.16,1,.3,1);
+  --ease-io:cubic-bezier(.65,0,.35,1);
+}
+*,*::before,*::after{box-sizing:border-box}
+html{ -webkit-text-size-adjust:100%; scroll-behavior:auto; }
+body{
+  margin:0; background:var(--ink); color:var(--bone);
+  font-family:'Onest',system-ui,-apple-system,'Helvetica Neue',sans-serif;
+  font-weight:300; font-size:16px; line-height:1.6;
+  -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+  overflow-x:hidden;
+}
+body.is-locked{ overflow:hidden; height:100vh; }
+::selection{ background:var(--accent); color:#fff; }
+img{max-width:100%;display:block}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+
+/* ============================================================= layers */
+#gl{
+  position:fixed; inset:0; width:100%; height:100%;
+  display:block; z-index:0; background:#050505;
+}
+#grain{
+  position:fixed; inset:-1px; z-index:60; pointer-events:none;
+  opacity:.055; mix-blend-mode:overlay;
+  background-repeat:repeat; background-size:180px 180px;
+}
+#vignette{
+  position:fixed; inset:0; z-index:55; pointer-events:none;
+  background:radial-gradient(125% 95% at 50% 42%, transparent 40%, rgba(0,0,0,.58) 100%);
+}
+.page{ position:relative; z-index:10; }
+
+/* ============================================================= type */
+.eyebrow{
+  font-size:10px; font-weight:500; letter-spacing:.22em; text-transform:uppercase;
+  color:var(--bone-dim); text-shadow:0 1px 16px rgba(0,0,0,.9);
+}
+h1,h2,h3{ font-weight:400; margin:0; letter-spacing:-.005em; }
+.display{
+  text-transform:uppercase; line-height:1.055; letter-spacing:-.012em;
+  font-weight:400; text-shadow:0 2px 34px rgba(0,0,0,.72);
+}
+.h-hero{ font-size:clamp(26px,3.05vw,46px); }
+.h-sec{ font-size:clamp(30px,4.0vw,60px); }
+.body-lg{ font-size:clamp(14px,1.02vw,17px); line-height:1.72; color:#c6cacd; font-weight:300; text-shadow:0 1px 20px rgba(0,0,0,.88); }
+.body{ font-size:14px; line-height:1.68; color:#a6aaae; font-weight:300; text-shadow:0 1px 18px rgba(0,0,0,.85); }
+.num{ font-size:clamp(26px,2.5vw,36px); font-weight:300; letter-spacing:-.02em; color:var(--bone); font-variant-numeric:tabular-nums; }
+
+/* ============================================================= reveal */
+[data-rv]{ opacity:0; }
+[data-rv="up"]{ transform:translate3d(0,26px,0); }
+[data-rv="fade"]{ transform:none; }
+[data-rv].rv-in{ opacity:1; transform:none;
+  transition:opacity .9s var(--ease-out), transform 1.05s var(--ease-out); }
+.mask-line{ display:block; overflow:hidden; }
+.mask-line:not(.word-reveal) > span{ display:block; transform:translate3d(0,110%,0); }
+.rv-in .mask-line:not(.word-reveal) > span, .mask-line:not(.word-reveal).rv-in > span{ transform:none; }
+.mask-line:not(.word-reveal) > span{ transition:transform 1.05s var(--ease-out); }
+.word-mask{ display:inline-block; overflow:hidden; vertical-align:top; }
+.word{
+  display:inline-block; opacity:0; transform:translate3d(0,112%,0); will-change:transform,opacity;
+  transition:transform .82s var(--ease-out), opacity .5s var(--ease-out);
+  transition-delay:var(--word-delay,0ms);
+}
+.word-reveal.rv-in .word{ opacity:1; transform:none; }
+
+/* ============================================================= preloader */
+#pre{
+  position:fixed; inset:0; z-index:100; background:#050505;
+  display:flex; align-items:center; justify-content:center;
+  transition:opacity .8s var(--ease), visibility .8s;
+}
+#pre.done{ opacity:0; visibility:hidden; pointer-events:none; }
+.pre-in{ width:min(420px,74vw); text-align:center; }
+.pre-mark{ margin:0 auto 26px; width:44px; height:44px; opacity:.9; }
+.pre-mark svg{ width:100%; height:100%; display:block; }
+.pre-tag{ font-size:12px; font-weight:500; letter-spacing:.58em; text-indent:.58em; color:var(--bone-dim); margin-bottom:20px; text-transform:uppercase; }
+.pre-bar{ position:relative; height:1px; background:rgba(245,245,245,.14); overflow:hidden; }
+.pre-bar i{ position:absolute; inset:0 100% 0 0; background:var(--bone); transition:right .35s linear; }
+.pre-meta{ display:flex; justify-content:space-between; margin-top:12px;
+  font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); }
+.pre-meta b{ font-weight:500; color:var(--bone-dim); font-variant-numeric:tabular-nums; }
+
+/* ============================================================= nav */
+.nav{
+  /* Width comes from --vw, not from right:0. A fixed element resolves its
+     inset against the initial containing block, and the page's own horizontal
+     overflow makes that block wider than the screen — 437 against a 390 phone,
+     860 against a 768 tablet — which carried the burger off the right edge.
+     --vw is the layout viewport, written on every resize. */
+  position:fixed; top:0; left:0; width:var(--vw, 100%); height:var(--nav-h); z-index:50;
+  display:flex; align-items:center; gap:24px; padding:0 var(--pad);
+  transition:transform .55s var(--ease);
+}
+/* The sticky wash sits on its own layer rather than on the bar. A
+   backdrop-filter promotes its element to the containing block for any
+   position:fixed descendant, and the bar holds the mobile menu sheet — put the
+   blur here and the sheet was measured against an 84px bar instead of the
+   frame, for as long as the blur took to fade. */
+.nav::before{
+  content:''; position:absolute; inset:0; z-index:-1; pointer-events:none;
+  background:rgba(5,5,5,.62);
+  backdrop-filter:blur(14px) saturate(1.1); -webkit-backdrop-filter:blur(14px) saturate(1.1);
+  opacity:0; transition:opacity .5s linear;
+}
+.nav.stuck::before{ opacity:1; }
+.nav::after{
+  content:''; position:absolute; left:var(--pad); right:var(--pad); bottom:0; height:1px;
+  background:var(--line-soft); opacity:0; transition:opacity .5s;
+}
+.nav.stuck::after{ opacity:1; }
+.nav.hide{ transform:translate3d(0,-101%,0); }
+.brand{ display:flex; align-items:center; gap:11px; flex:0 0 auto; }
+.brand svg{ width:32px; height:32px; display:block; }
+.brand-tx{ display:flex; flex-direction:column; line-height:1; gap:3px; }
+.brand-tx b{ font-size:12px; font-weight:500; letter-spacing:.26em; }
+.brand-tx i{ font-style:normal; font-size:8px; letter-spacing:.34em; color:var(--muted); }
+.nav-links{ display:flex; gap:clamp(16px,2.2vw,40px); margin-left:auto; }
+.nav-link{
+  position:relative; font-size:11px; font-weight:500; letter-spacing:.2em; text-transform:uppercase;
+  color:var(--muted); display:block; height:15px; line-height:15px; overflow:hidden;
+}
+.nav-link span{ display:block; height:15px; line-height:15px; transition:transform .55s var(--ease-out), color .3s; }
+.nav-link .alt{ position:absolute; inset:0; transform:translate3d(0,100%,0); color:var(--bone); letter-spacing:.32em; }
+.nav-link:hover span{ transform:translate3d(0,-100%,0); }
+.nav-link:hover .alt{ transform:none; }
+.nav-link:hover{ color:var(--bone-dim); }
+.nav-link.on{ color:var(--bone); }
+.nav-link.on::after{ content:''; position:absolute; left:0; bottom:0; width:100%; height:1px; background:var(--accent);
+  box-shadow:0 0 8px rgba(224,35,28,.55); }
+.nav-burger{ margin-left:clamp(18px,2.6vw,42px); width:26px; height:16px; position:relative; flex:0 0 auto; }
+.nav-burger i{ position:absolute; right:0; height:1.5px; background:var(--bone); transition:width .45s var(--ease-out), transform .45s var(--ease-out); }
+.nav-burger i:nth-child(1){ top:4px; width:26px; }
+.nav-burger i:nth-child(2){ top:11px; width:17px; }
+.nav-burger:hover i:nth-child(2){ width:26px; }
+.nav-burger:hover i:nth-child(1){ width:17px; }
+
+/* ============================================================= hero */
+.hero{ position:relative; min-height:100svh; padding:0 var(--pad); display:flex; flex-direction:column; }
+.hero::before{ content:''; position:absolute; left:0; right:0; top:0; height:46%; pointer-events:none;
+  background:linear-gradient(rgba(0,0,0,.66), rgba(0,0,0,.3) 46%, transparent); }
+.hero-top{ padding-top:calc(var(--nav-h) + clamp(12px,2.6vh,34px)); max-width:min(590px,46vw); position:relative; z-index:2; }
+.hero-top .eyebrow{ display:flex; align-items:center; gap:10px; margin-bottom:20px; }
+.hero-top .eyebrow .dot{ width:5px; height:5px; border-radius:50%; background:var(--accent); box-shadow:0 0 10px var(--accent); }
+.hero h1{ margin-bottom:18px; }
+.hero-role{ font-size:clamp(12px,.95vw,15px); font-weight:500; letter-spacing:.3em; text-transform:uppercase;
+  color:var(--bone-dim); margin:0 0 18px; }
+.hero-role em{ font-style:normal; color:var(--accent); }
+.hero-sub{ max-width:352px; text-shadow:0 1px 26px rgba(0,0,0,.95); }
+.ctas{ display:flex; gap:14px; margin-top:30px; flex-wrap:wrap; }
+.hero-spacer{ flex:1 1 auto; min-height:clamp(140px,26vh,300px); }
+.hero-foot{ padding-bottom:clamp(22px,4.2vh,42px); position:relative; z-index:2; width:min(560px,52vw); }
+.hero-cue{ display:flex; align-items:center; justify-content:flex-start; gap:12px; margin-bottom:14px;
+  font-size:9px; letter-spacing:.3em; text-transform:uppercase; color:var(--muted); }
+.hero-cue .track{ width:54px; height:1px; background:var(--line); position:relative; overflow:hidden; }
+.hero-cue .track i{ position:absolute; inset:0; background:var(--bone); transform-origin:left;
+  animation:cue 2.8s var(--ease-io) infinite; }
+.chapters{
+  display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px;
+  border-top:1px solid var(--line-soft); padding-top:18px;
+}
+.chip{ display:flex; gap:14px; align-items:flex-start; cursor:pointer; }
+.chip .num{ line-height:1; flex:0 0 auto; transition:color .4s, transform .5s var(--ease-out); }
+.chip .tx{ min-width:0; padding-top:3px; }
+.chip b{ display:block; font-size:10px; font-weight:500; letter-spacing:.2em; text-transform:uppercase;
+  color:var(--bone-dim); margin-bottom:6px; transition:color .4s;
+  text-shadow:0 1px 16px rgba(0,0,0,.9); }
+.chip p{ margin:0; font-size:11px; line-height:1.5; color:#7c8085; max-width:22ch;
+  transition:color .4s; }
+.chip:hover .num{ color:var(--accent); transform:translate3d(0,-2px,0); }
+.chip:hover b{ color:var(--bone); }
+.chip:hover p{ color:var(--bone-dim); }
+.chip.on .num{ color:var(--accent); }
+.chip.on b{ color:var(--bone); }
+.hero-side{
+  position:absolute; z-index:2; right:var(--pad); top:calc(var(--nav-h) + clamp(14px,3vh,42px));
+  pointer-events:none;
+}
+.hero-side .v{ writing-mode:vertical-rl; font-size:clamp(16px,1.5vw,22px); letter-spacing:.42em;
+  text-transform:uppercase; color:rgba(245,245,245,.42); }
+@keyframes cue{ 0%{transform:scaleX(0)} 42%{transform:scaleX(1)} 100%{transform:scaleX(1) translateX(100%)} }
+
+/* ============================================================= sections */
+.sec{ position:relative; padding:clamp(88px,15vh,190px) var(--pad); }
+.sec::before{
+  content:''; position:absolute; inset:-22% -4%; z-index:-1; pointer-events:none;
+  background:radial-gradient(110% 62% at 30% 50%, rgba(2,2,3,.88), rgba(2,2,3,.6) 42%, rgba(2,2,3,.16) 74%, rgba(2,2,3,0));
+  /* A chapter's scrim is there to hold its own copy off the world, and it is
+     inset -22% so its edges never land as a seam. That overshoot, plus the
+     section's top padding, means it was washing most of a screen of scene
+     above the chapter — the mask takes the top of it back off. */
+  -webkit-mask-image:linear-gradient(transparent, #000 44%);
+          mask-image:linear-gradient(transparent, #000 44%);
+}
+#skills::before{ background:radial-gradient(108% 64% at 50% 50%, rgba(2,2,3,.72), rgba(2,2,3,.42) 50%, rgba(2,2,3,0)); }
+#contact::before{ background:radial-gradient(82% 58% at 50% 46%, rgba(2,2,3,.24), rgba(2,2,3,.62) 56%, rgba(2,2,3,.9) 82%, rgba(2,2,3,0)); }
+/* Nothing inside a section may widen the document. The silhouette sheets are
+   placed to hang past the frame edges on purpose, and as ordinary in-flow
+   descendants they would drag the page box out with them. */
+.sec{ overflow-x:clip; overflow-y:visible; }
+.sec-head{ display:flex; align-items:baseline; gap:16px; margin-bottom:clamp(30px,5vh,66px); }
+.sec-head .k{ font-size:10px; font-weight:500; letter-spacing:.24em; text-transform:uppercase; color:var(--muted); }
+.sec-head .k b{ color:var(--accent); font-weight:500; }
+.rule{ flex:1 1 auto; height:1px; background:var(--line-soft); }
+
+/* — chapter: about */
+.about-grid{ display:grid; grid-template-columns:minmax(120px,.38fr) minmax(0,1.08fr) minmax(280px,.88fr); gap:clamp(20px,3vw,54px); }
+.about-grid h2{ grid-column:1 / 3; max-width:13ch; }
+.about-copy{ grid-column:3; padding-top:6px; }
+.about-copy .lead{ font-size:clamp(15px,1.16vw,19px); line-height:1.66; color:#d3d7da; text-shadow:0 1px 20px rgba(0,0,0,.9); }
+.about-copy .lead + p{ margin-top:20px; }
+.tags{ display:flex; flex-wrap:wrap; gap:8px; margin-top:24px; }
+.tags i{ font-style:normal; font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+  padding:6px 11px; border:1px solid var(--line-soft); color:var(--muted); transition:color .35s, border-color .35s; }
+.tags i:hover{ color:var(--bone); border-color:var(--line); }
+.about-stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:0; margin-top:clamp(46px,8vh,96px); }
+.about-stats div{ min-height:108px; padding:18px; border-left:1px solid var(--line-soft); }
+.about-stats div:last-child{ border-right:1px solid var(--line-soft); }
+.about-stats div b{ display:block; font-size:clamp(22px,2.1vw,32px); font-weight:300; letter-spacing:-.02em; }
+.about-stats div span{ font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); }
+
+/* — chapter: skills · a systems readout wired into the world */
+.skills-head{ display:grid; grid-template-columns:minmax(0,.72fr) minmax(0,1.2fr); gap:clamp(28px,5vw,90px); align-items:end; margin-bottom:clamp(34px,6vh,72px); }
+.skills-head h2{ max-width:13ch; }
+.skills{ border-top:1px solid var(--line-soft); }
+.skill{
+  position:relative; display:grid; align-items:center;
+  grid-template-columns:56px minmax(0,1.05fr) minmax(0,1.25fr) 92px;
+  gap:clamp(14px,2.4vw,40px);
+  padding:clamp(20px,2.4vw,30px) 0; border-bottom:1px solid var(--line-soft);
+  cursor:pointer; transition:padding .5s var(--ease-out);
+}
+.skill::before{ content:''; position:absolute; left:calc(var(--pad) * -1); right:0; top:0; bottom:0;
+  background:linear-gradient(90deg, rgba(224,35,28,.09), transparent 46%);
+  opacity:0; transition:opacity .55s var(--ease); pointer-events:none; }
+.skill:hover::before, .skill.on::before{ opacity:1; }
+.skill:hover, .skill.on{ padding-left:clamp(8px,1.2vw,18px); }
+.skill .k{ font-size:11px; letter-spacing:.16em; color:var(--muted); font-variant-numeric:tabular-nums; transition:color .4s; }
+.skill:hover .k, .skill.on .k{ color:var(--accent); }
+.skill h3{ font-size:clamp(16px,1.5vw,23px); font-weight:400; letter-spacing:-.005em; }
+.skill p{ margin:0; font-size:13px; line-height:1.6; color:#9a9ea3; text-shadow:0 1px 16px rgba(0,0,0,.92); }
+.skill .t{ text-align:right; font-size:11px; letter-spacing:.14em; color:#8d9196; font-variant-numeric:tabular-nums; text-shadow:0 1px 16px rgba(0,0,0,.92); }
+.skill .bar{ position:absolute; left:0; bottom:-1px; height:1px; width:100%; background:var(--accent);
+  transform:scaleX(0); transform-origin:left; transition:transform .7s var(--ease-out); }
+.skill:hover .bar, .skill.on .bar{ transform:scaleX(1); }
+
+/* — chapter: projects · each one a live window into the world
+   The frame is a hole punched in the page — the scene is rendered straight
+   into this rectangle with a scissored viewport, so hovering a project leans
+   its own camera toward the subject. */
+.proj{
+  display:grid; grid-template-columns:minmax(0,1.22fr) minmax(0,1fr);
+  gap:clamp(26px,4.4vw,80px); align-items:center;
+  margin-bottom:clamp(64px,11vh,150px);
+}
+.proj:last-child{ margin-bottom:0; }
+.proj:nth-child(even) .proj-fr{ order:2; }
+.proj-fr{
+  position:relative; aspect-ratio:16/10; background:transparent;
+  outline:1px solid var(--line-soft); outline-offset:-1px;
+  transition:outline-color .5s var(--ease);
+}
+.proj:hover .proj-fr{ outline-color:rgba(245,245,245,.32); }
+.proj-fr::after{ content:''; position:absolute; inset:0;
+  background:linear-gradient(transparent 52%, rgba(0,0,0,.5)); pointer-events:none; }
+.proj-num{ font-size:10px; font-weight:500; letter-spacing:.3em; text-transform:uppercase; color:var(--accent); }
+.proj-info h3{ font-size:clamp(22px,2.4vw,38px); margin:12px 0 14px; }
+.proj-info .lead{ font-size:clamp(14px,1.05vw,17px); line-height:1.66; color:#cfd3d6; margin:0; }
+.proj-stack{ display:flex; flex-wrap:wrap; gap:8px; margin-top:20px; }
+.proj-stack i{ font-style:normal; font-size:10px; letter-spacing:.14em; text-transform:uppercase;
+  padding:6px 11px; border:1px solid var(--line-soft); color:var(--muted); }
+.proj-feats{ list-style:none; margin:18px 0 0; padding:0; display:flex; flex-direction:column; gap:7px; }
+.proj-feats li{ font-size:13px; color:#9a9ea3; display:flex; align-items:baseline; gap:10px; }
+.proj-feats li::before{ content:''; width:14px; height:1px; background:var(--accent); flex:0 0 auto; transform:translateY(-4px); }
+.arrowlink{ display:inline-flex; align-items:center; gap:12px; margin-top:28px;
+  font-size:11px; font-weight:500; letter-spacing:.2em; text-transform:uppercase; color:var(--bone); }
+.arrowlink .ar{ width:34px; height:34px; border:1px solid var(--line); border-radius:50%;
+  display:grid; place-items:center; transition:background .45s var(--ease), border-color .45s, transform .5s var(--ease-out); }
+.arrowlink .ar svg{ width:13px; height:13px; transition:transform .5s var(--ease-out); }
+.arrowlink:hover .ar{ background:var(--accent); border-color:var(--accent); }
+.arrowlink:hover .ar svg{ transform:translate3d(2px,-2px,0); }
+.arrowlink:hover .ar svg path{ stroke:#fff; }
+
+/* — chapter: journey */
+.tl{ position:relative; margin-top:clamp(10px,2vh,24px); border-left:1px solid var(--line-soft); padding-left:clamp(26px,3vw,44px); }
+.tl-item{ position:relative; display:grid; grid-template-columns:110px 1fr; gap:clamp(16px,2.4vw,40px);
+  align-items:baseline; padding:clamp(20px,2.6vw,30px) 0; }
+.tl-item + .tl-item{ border-top:1px solid var(--line-soft); }
+.tl-item::before{ content:''; position:absolute; left:calc(clamp(26px,3vw,44px) * -1 - 5px); top:50%;
+  width:9px; height:9px; border-radius:50%; border:1px solid var(--line); background:var(--ink);
+  transform:translateY(-50%); transition:background .4s, border-color .4s, box-shadow .4s; }
+.tl-item .yr{ font-size:clamp(18px,1.7vw,26px); font-weight:300; color:var(--bone); font-variant-numeric:tabular-nums; letter-spacing:.02em; }
+.tl-item p{ margin:0; font-size:14px; color:var(--muted); transition:color .4s; }
+.tl-item:hover p{ color:var(--bone-dim); }
+.tl-item:hover::before{ border-color:var(--bone-dim); }
+.tl-item.cur .yr{ color:var(--accent); }
+.tl-item.cur::before{ background:var(--accent); border-color:var(--accent); box-shadow:0 0 12px rgba(224,35,28,.7); }
+.tl-item.cur p{ color:var(--bone-dim); }
+
+/* — chapter: contact */
+.fin{ min-height:100svh; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; }
+.fin .eyebrow{ margin-bottom:26px; }
+.fin h2{ font-size:clamp(38px,7.4vw,124px); line-height:.94; letter-spacing:-.03em; text-transform:uppercase; }
+.fin p{ max-width:44ch; margin:26px auto 0; }
+.contact-btns{ display:flex; gap:14px; justify-content:center; margin-top:44px; flex-wrap:wrap; }
+.cta{
+  position:relative; display:inline-flex; align-items:center; gap:14px;
+  padding:17px 30px; border:1px solid var(--line); border-radius:100px; overflow:hidden;
+  font-size:11px; font-weight:500; letter-spacing:.22em; text-transform:uppercase;
+  transition:color .45s var(--ease), border-color .45s;
+}
+.cta i{ position:absolute; inset:0; background:var(--bone); transform:translate3d(0,101%,0);
+  transition:transform .62s var(--ease-out); z-index:-1; }
+.cta span,.cta svg{ position:relative; z-index:1; }
+.cta:hover{ color:#050505; border-color:var(--bone); }
+.cta:hover i{ transform:none; }
+.cta--primary i{ background:var(--accent); }
+.cta--primary{ border-color:rgba(224,35,28,.5); }
+.cta--primary:hover{ color:#fff; border-color:var(--accent); }
+/* the closing bar — the colophon lives at the foot of the final chapter */
+.foot-bar{ position:absolute; left:0; right:0; bottom:0; display:flex; justify-content:space-between;
+  align-items:center; gap:18px; flex-wrap:wrap; padding:24px var(--pad) 30px;
+  border-top:1px solid var(--line-soft); font-size:10px; letter-spacing:.18em;
+  text-transform:uppercase; color:var(--muted); }
+.foot-bar a{ color:var(--muted); transition:color .35s; }
+.foot-bar a:hover{ color:var(--bone); }
+.foot-bar .r{ color:var(--bone-dim); }
+
+/* ============================================================= progress rail */
+.rail{ position:fixed; right:calc(var(--pad) - 4px); top:50%; transform:translateY(-50%); z-index:45;
+  display:flex; flex-direction:column; gap:12px; align-items:center; }
+.rail button{ width:22px; height:10px; display:grid; place-items:center; }
+.rail i{ display:block; width:14px; height:1px; background:rgba(245,245,245,.26); transition:.5s var(--ease-out); }
+.rail button.on i{ width:22px; background:var(--bone); }
+.rail button:hover i{ width:22px; background:var(--bone-dim); }
+
+/* ============================================================= cursor */
+.cur-dot{ position:fixed; z-index:80; top:0; left:0; width:26px; height:26px; margin:-13px 0 0 -13px;
+  border:1px solid rgba(245,245,245,.42); border-radius:50%; pointer-events:none;
+  transition:width .35s var(--ease-out), height .35s var(--ease-out), margin .35s var(--ease-out),
+             background .35s, border-color .35s, opacity .3s; opacity:0; }
+.cur-dot.act{ width:52px; height:52px; margin:-26px 0 0 -26px; background:rgba(245,245,245,.07); border-color:rgba(245,245,245,.6); }
+@media (hover:hover) and (pointer:fine){ .cur-dot{ opacity:1 } }
+
+/* ============================================================= responsive */
+@media (max-width:1080px){
+  .hero-top{ max-width:none; }
+  .hero-foot{ width:100%; }
+  .about-grid{ grid-template-columns:1fr; }
+  .about-grid h2, .about-copy{ grid-column:auto; }
+  .about-grid h2{ max-width:16ch; }
+  .about-stats{ grid-template-columns:repeat(2,1fr); }
+  .skills-head{ grid-template-columns:1fr; gap:18px; }
+  .skill{ grid-template-columns:44px minmax(0,1fr) 74px; }
+  .skill p{ display:none; }
+  .proj{ grid-template-columns:1fr; gap:22px; }
+  .proj:nth-child(even) .proj-fr{ order:0; }
+  .tl-item{ grid-template-columns:84px 1fr; }
+}
+@media (max-width:820px){
+  .nav-links{
+    display:flex; position:fixed; top:0; right:0; bottom:0; width:min(84vw,360px);
+    padding:calc(var(--nav-h) + 28px) var(--pad) 34px; flex-direction:column; align-items:flex-start; gap:0;
+    background:rgba(4,4,5,.98); border-left:1px solid var(--line-soft);
+    transform:translate3d(100%,0,0); opacity:0; visibility:hidden; pointer-events:none;
+    transition:transform .65s var(--ease-out), opacity .4s, visibility 0s linear .65s;
+  }
+  .nav.menu-open .nav-links{
+    transform:none; opacity:1; visibility:visible; pointer-events:auto; transition-delay:0s;
+  }
+  .nav-links .nav-link{
+    width:100%; height:auto; padding:17px 0; overflow:visible; border-bottom:1px solid var(--line-soft);
+    font-size:17px; line-height:1.2;
+  }
+  .nav-links .nav-link span{ height:auto; line-height:1.2; transform:none !important; }
+  .nav-links .nav-link .alt{ position:static; margin-top:6px; font-size:10px; color:var(--muted); }
+  /* A transform *or* a backdrop-filter makes an element the containing block
+     for its position:fixed descendants. This panel is a child of the bar, so
+     once the bar went sticky and started hiding on scroll the open panel was
+     measured against the bar instead of the viewport. Neither may apply while
+     the sheet is open — it covers the frame, so there is nothing left to blur. */
+  .nav.menu-open{ transform:none; transition:none; }
+  .nav-burger{ margin-left:auto; }
+  .nav-burger.active i:nth-child(1){ top:7px; width:26px; transform:rotate(45deg); }
+  .nav-burger.active i:nth-child(2){ top:7px; width:26px; transform:rotate(-45deg); }
+  html.nav-open,html.nav-open body{ overflow:hidden; }
+  .rail{ display:none; }
+  .hero-side{ display:none; }
+  .chapters{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px 14px; }
+  .chip p{ font-size:10px; }
+  .about-stats{ grid-template-columns:repeat(2,1fr); }
+  .about-stats div{ min-height:86px; padding:14px; }
+  .about-stats div:nth-child(-n+2){ border-bottom:1px solid var(--line-soft); }
+  .skills-head h2{ font-size:clamp(30px,7.4vw,44px); }
+  .tl{ padding-left:22px; }
+  .tl-item{ grid-template-columns:1fr; gap:4px; }
+  .tl-item::before{ left:-27px; }
+  .fin h2{ font-size:clamp(38px,11vw,72px); }
+  .foot-bar{ justify-content:center; text-align:center; }
+  .hero-cue{ display:none; }
+}
+@media (max-width:560px){
+  .chapters{ gap:14px; }
+  .chip{ flex-direction:column; gap:4px; }
+  .chip .num{ font-size:clamp(22px,7.4vw,30px); }
+  .chip .tx{ padding-top:0; }
+  .chip p{ max-width:none; }
+  .skill{ grid-template-columns:34px minmax(0,1fr) 64px; gap:12px; }
+  .about-stats{ grid-template-columns:1fr 1fr; }
+}
+
+@media (prefers-reduced-motion:reduce){
+  *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
+  [data-rv]{ opacity:1 !important; transform:none !important; }
+  .mask-line > span,.word{ opacity:1 !important; transform:none !important; }
+}
+
+/* ============================================================= no-webgl
+   If WebGL will not start, the page stays a page: the world becomes a still,
+   and the wordmark moves from the 3-D layer into the document. */
+.word-fb{ display:none; }
+.no-webgl #gl{ display:none; }
+.no-webgl body{ background:
+  radial-gradient(44vw 44vw at 50% 40%, rgba(224,35,28,.10), rgba(224,35,28,.035) 42%, transparent 70%),
+  radial-gradient(120% 80% at 50% 0%, rgba(150,168,184,.09), transparent 60%),
+  repeating-linear-gradient(0deg, rgba(245,245,245,.026) 0 1px, transparent 1px 64px),
+  repeating-linear-gradient(90deg, rgba(245,245,245,.026) 0 1px, transparent 1px 64px),
+  #050505;
+  background-attachment:fixed; }
+.no-webgl .sec::before, .no-webgl #skills::before, .no-webgl #contact::before{ background:none; }
+.no-webgl .word-fb{
+  display:block; position:absolute; left:0; right:0; bottom:18%; z-index:1;
+  font-family:'Onest','Helvetica Neue',sans-serif; font-weight:400; font-size:16.5vw; line-height:.8;
+  letter-spacing:.06em; text-align:center; pointer-events:none; text-transform:uppercase;
+  background:linear-gradient(#f2f4f6, #8d9196); -webkit-background-clip:text; background-clip:text;
+  color:transparent;
+}
+/* The live hero has no foot scrim, but the fallback still needs one. */
+.no-webgl .hero::after{ content:''; position:absolute; left:0; right:0; bottom:0; height:34%;
+  pointer-events:none; background:linear-gradient(transparent, rgba(2,2,3,.72) 52%, rgba(2,2,3,.96)); }
+</style>
+</head>
+<body>
+
+<canvas id="gl" aria-hidden="true"></canvas>
+<div id="vignette"></div>
+<div id="grain"></div>
+<div class="cur-dot" id="cursor"></div>
+
+<!-- ============================================================ preloader -->
+<div id="pre">
+  <div class="pre-in">
+    <div class="pre-mark">
+      <svg viewBox="0 0 44 44" fill="none" aria-hidden="true">
+        <circle cx="22" cy="22" r="12" stroke="#e0231c" stroke-width="1.2"/>
+        <circle cx="22" cy="22" r="3.4" fill="#e0231c"/>
+        <path d="M22 3v7M22 34v7M3 22h7M34 22h7" stroke="#f5f5f5" stroke-width="1" stroke-opacity=".55"/>
+      </svg>
+    </div>
+    <div class="pre-tag">Razer</div>
+    <div class="pre-bar"><i id="pre-fill"></i></div>
+    <div class="pre-meta">
+      <span>Booting the digital world</span><b><span id="pre-pct">0</span>%</b>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ nav -->
+<header class="nav" id="nav">
+  <a class="brand" href="#top" data-cursor>
+    <svg viewBox="0 0 44 44" fill="none" aria-hidden="true">
+      <circle cx="22" cy="22" r="13" stroke="#e0231c" stroke-width="1.4"/>
+      <circle cx="22" cy="22" r="4.2" fill="#e0231c"/>
+      <path d="M22 2v6.5M22 35.5V42M2 22h6.5M35.5 22H42" stroke="#f5f5f5" stroke-width="1.2" stroke-opacity=".5"/>
+    </svg>
+    <span class="brand-tx"><b>RAZER</b><i>DEVELOPER PORTFOLIO</i></span>
+  </a>
+  <nav class="nav-links" id="navlinks"><!-- rendered from NAV data --></nav>
+  <button class="nav-burger" aria-label="Menu" data-cursor><i></i><i></i></button>
+</header>
+
+<div class="page" id="top">
+
+<!-- ============================================================ 01 · intro -->
+<section class="hero" id="hero" data-cam="0">
+  <div class="hero-top">
+    <div class="eyebrow" data-rv="fade"><span class="dot"></span> 01 — Intro · Razer's digital world</div>
+    <h1 class="display h-hero">
+      <span class="mask-line"><span>Computer Engineering</span></span>
+      <span class="mask-line"><span>Student. Developer.</span></span>
+      <span class="mask-line"><span>Builder.</span></span>
+    </h1>
+    <p class="hero-role" data-rv="fade">Developer <em>·</em> Builder <em>·</em> Linux Enthusiast</p>
+    <p class="hero-sub body" data-rv="up">Building software, experimenting with technology, and turning
+      random ideas into real projects.</p>
+    <div class="ctas" data-rv="fade">
+      <a class="cta cta--primary" href="#about" data-cursor><i></i><span>Explore</span>
+        <svg viewBox="0 0 14 14" fill="none" width="13" height="13"><path d="M7 2v10M3 8.4 7 12l4-3.6" stroke="currentColor" stroke-width="1.3"/></svg></a>
+      <a class="cta" href="#projects" data-cursor><i></i><span>View Projects</span></a>
+    </div>
+  </div>
+
+  <div class="hero-spacer"></div>
+
+  <div class="hero-foot">
+    <div class="hero-cue" data-rv="fade"><span>Scroll to enter</span><span class="track"><i></i></span></div>
+    <div class="chapters" id="chips"><!-- rendered from CHAPTERS data --></div>
+  </div>
+
+  <div class="word-fb" aria-hidden="true">Razer</div>
+
+  <div class="hero-side" data-rv="up">
+    <span class="v">Digital World — Razer</span>
+  </div>
+</section>
+
+<!-- ============================================================ 02 · about -->
+<section class="sec" id="about" data-cam="1">
+  <div class="sec-head" data-rv="fade">
+    <span class="k"><b>02</b> — About Me</span><span class="rule"></span><span class="k">Profile</span>
+  </div>
+  <div class="about-grid">
+    <h2 class="display h-sec" data-rv="up">Building more than talking.</h2>
+    <div class="about-copy">
+      <p class="lead" data-rv="up">I'm a Computer Engineering student who enjoys building things more
+        than talking about building them.</p>
+      <p class="body" data-rv="up">Most of what I know came from starting something slightly beyond my
+        current reach and figuring it out on the way: bots that index files, stores that sell,
+        scripts that make Linux do the boring parts. This site is that habit, rendered as a place
+        you can walk through.</p>
+      <div class="tags" data-rv="up">
+        <i>Software Development</i><i>Python</i><i>Linux</i><i>Web Development</i>
+        <i>AI</i><i>Automation</i><i>Cybersecurity</i><i>Open Source</i>
+      </div>
+      <a class="arrowlink" href="#skills" data-rv="fade" data-cursor>
+        <span>Run the systems scan</span>
+        <span class="ar"><svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="#f5f5f5" stroke-width="1.3"/></svg></span>
+      </a>
+    </div>
+  </div>
+  <div class="about-stats" data-rv="up">
+    <div><b>2024</b><span>Started the degree</span></div>
+    <div><b>11</b><span>Tools in the kit</span></div>
+    <div><b>03</b><span>Projects shown</span></div>
+    <div><b>∞</b><span>Side quests</span></div>
+  </div>
+</section>
+
+<!-- ============================================================ 03 · skills -->
+<section class="sec" id="skills" data-cam="2">
+  <div class="sec-head" data-rv="fade">
+    <span class="k"><b>03</b> — Skills</span><span class="rule"></span><span class="k">System Scan</span>
+  </div>
+  <div class="skills-head">
+    <h2 class="display h-sec" data-rv="up">The toolbox, as a live readout.</h2>
+    <p class="body-lg" data-rv="up">Not a wall of cards — a systems list wired into the world.
+      Each line is anchored to a pylon standing in the fog ahead. Hover a row and its
+      marker ignites.</p>
+  </div>
+  <div class="skills" id="skills-list"><!-- rendered from SKILLS data --></div>
+</section>
+
+<!-- ============================================================ 04 · projects -->
+<section class="sec" id="projects" data-cam="3">
+  <div class="sec-head" data-rv="fade">
+    <span class="k"><b>04</b> — Selected Projects</span><span class="rule"></span><span class="k">Work</span>
+  </div>
+  <p class="body-lg" style="max-width:52ch; margin:0 0 clamp(38px,7vh,84px);" data-rv="up">Three builds
+    that taught me the most. Each frame below is a live window into the world — hover a project
+    and its camera leans in.</p>
+  <div id="proj-list"><!-- rendered from PROJECTS data --></div>
+</section>
+
+<!-- ============================================================ 05 · journey -->
+<section class="sec" id="journey" data-cam="4">
+  <div class="sec-head" data-rv="fade">
+    <span class="k"><b>05</b> — The Journey</span><span class="rule"></span><span class="k">Timeline</span>
+  </div>
+  <div class="skills-head">
+    <h2 class="display h-sec" data-rv="up">Four markers. No filler.</h2>
+    <p class="body-lg" data-rv="up">No invented job titles, no fake clients — just the path so far,
+      in the order it actually happened.</p>
+  </div>
+  <div class="tl" id="timeline"><!-- rendered from TIMELINE data --></div>
+</section>
+
+<!-- ============================================================ 06 · contact -->
+<section class="sec fin" id="contact" data-cam="5">
+  <div class="eyebrow" data-rv="fade">06 — Contact</div>
+  <h2 class="display" data-rv="up">
+    <span class="mask-line"><span>Let's build</span></span>
+    <span class="mask-line"><span>something.</span></span>
+  </h2>
+  <p class="body-lg" data-rv="up">Have an idea, project, collaboration, or just want to talk tech?</p>
+  <div class="contact-btns" id="contact-btns"><!-- rendered from PROFILE data --></div>
+  <div class="foot-bar">
+    <span class="r">Razer © 2026</span>
+    <span>WebGL · Three.js · Onest</span>
+    <a href="#top" data-cursor>Back to top</a>
+  </div>
+</section>
+
+</div><!-- /.page -->
+
+<div class="rail" id="rail"></div>
+
+<script src="razer-assets/three.min.js"></script>
+<script>
+/* =====================================================================
+   RAZER — a developer's digital world, rendered live.
+   Everything on this page is generated at runtime: no photographs,
+   no video, no external assets beyond three.js and the font subsets.
+   The engine — scroll rig, camera curve, post chain, card viewports,
+   perf governor — is the original architecture, re-aimed at a new world.
+   ===================================================================== */
+(function () {
+'use strict';
+
+/* ===================================================================
+   profile — the single place to edit the site's content.
+   NAV, CHAPTERS, SKILLS, PROJECTS and TIMELINE below are rendered into
+   the document at boot; change them here and every section follows.
+   =================================================================== */
+const PROFILE = {
+  name: 'RAZER',
+  role: 'Computer Engineering Student',
+  tags: 'Developer · Builder · Linux Enthusiast',
+  blurb: 'Building software, experimenting with technology, and turning random ideas into real projects.',
+  links: {
+    /* TODO: replace these placeholders with the real profiles. */
+    github:   'https://github.com/razer-dev',
+    linkedin: 'https://www.linkedin.com/in/razer-dev',
+    email:    'mailto:hello@razer.dev'
+  }
+};
+
+const NAV = [
+  { label: '01 Intro',    short: 'Intro',    href: '#hero' },
+  { label: '02 About',    short: 'About',    href: '#about' },
+  { label: '03 Skills',   short: 'Skills',   href: '#skills' },
+  { label: '04 Projects', short: 'Projects', href: '#projects' },
+  { label: '05 Journey',  short: 'Journey',  href: '#journey' },
+  { label: '06 Contact',  short: 'Contact',  href: '#contact' }
+];
+
+/* the four hero chips; `focus` is the world handle the hover warms */
+const CHAPTERS = [
+  { name: 'Enter',    blurb: 'The opening frame of the world.',           focus: 0 },
+  { name: 'About',    blurb: 'Who is behind the work — and why.',         focus: 1 },
+  { name: 'Skills',   blurb: 'A live systems readout of the kit.',        focus: 2 },
+  { name: 'Projects', blurb: 'Selected builds, shown as windows in.',     focus: 3 }
+];
+
+const SKILLS = [
+  { name: 'Python',                 level: 'Core',      tag: 'automation · scripting · bots' },
+  { name: 'JavaScript',             level: 'Core',      tag: 'the web, node, and everything loose' },
+  { name: 'HTML / CSS',             level: 'Core',      tag: 'layout, type, and the responsive box' },
+  { name: 'Django',                 level: 'Working',   tag: 'views, models, and the admin that ships' },
+  { name: 'Three.js',               level: 'Working',   tag: 'this very world — shaders, fog, cameras' },
+  { name: 'Linux',                  level: 'Core',      tag: 'daily driver · shell · systemd · dotfiles' },
+  { name: 'Git',                    level: 'Core',      tag: 'branches, rebases, and honest history' },
+  { name: 'Docker',                 level: 'Working',   tag: 'images, compose, and reproducible deploys' },
+  { name: 'MongoDB',                level: 'Working',   tag: 'documents, indexes, and aggregation' },
+  { name: 'AI / LLM experimentation', level: 'Learning', tag: 'recommendation systems · prompting · APIs' },
+  { name: 'Cybersecurity',          level: 'Learning',  tag: 'the defender\'s habit of mind' }
+];
+
+/* TODO: swap the placeholder `url` values for the real project links. */
+const PROJECTS = [
+  {
+    num: '01',
+    name: 'Razer Filter Bot',
+    desc: 'Telegram automation and file-search bot.',
+    stack: ['Python', 'Telegram API', 'MongoDB', 'Docker'],
+    features: ['File indexing', 'Search', 'Admin controls', 'Automated workflows', 'Deployment with Docker'],
+    url: 'https://example.com/razer-filter-bot'
+  },
+  {
+    num: '02',
+    name: 'Isblue',
+    desc: 'E-commerce platform and Shopify store project.',
+    stack: ['Shopify', 'Liquid', 'JavaScript', 'UI/UX', 'E-commerce'],
+    features: ['Product pages', 'Landing pages', 'Conversion-focused UI', 'Marketing experiments'],
+    url: 'https://example.com/isblue'
+  },
+  {
+    num: '03',
+    name: 'AI Movie Recommendation System',
+    desc: 'A recommendation system that uses user preferences and movie data to generate personalized recommendations.',
+    stack: ['Python', 'AI/ML', 'APIs'],
+    features: [],
+    url: 'https://example.com/ai-movie-recommendations'
+  }
+];
+
+const TIMELINE = [
+  { year: '2024',    label: 'Computer Engineering' },
+  { year: '2025',    label: 'Python · Linux · Programming' },
+  { year: '2026',    label: 'Projects · Web Development · Automation · AI' },
+  { year: 'CURRENT', label: 'Building → Learning → Experimenting' }
+];
+
+/* ------------------------------------------------------------ 0 · basics */
+const Q      = new URLSearchParams(location.search);
+const qs     = (k, d) => { const v = Q.get(k); return v === null ? d : v; };
+const qn     = (k, d) => { const v = Q.get(k); return v === null ? d : parseFloat(v); };
+const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const COARSE = matchMedia('(hover: none)').matches;
+
+const clamp  = (v, a, b) => v < a ? a : (v > b ? b : v);
+const sat    = v => clamp(v, 0, 1);
+const lerp   = (a, b, t) => a + (b - a) * t;
+const smooth = (e0, e1, x) => { const t = sat((x - e0) / (e1 - e0)); return t * t * (3 - 2 * t); };
+const easeOut= t => 1 - Math.pow(1 - t, 3);
+const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const TAU    = Math.PI * 2;
+/* frame-rate independent damping */
+const damp   = (cur, to, rate, dt) => lerp(cur, to, 1 - Math.exp(-rate * dt));
+
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+/* classic 2-D gradient noise */
+function noise2D(seed) {
+  const rnd = mulberry32(seed), p = new Uint8Array(256), perm = new Uint8Array(512);
+  for (let i = 0; i < 256; i++) p[i] = i;
+  for (let i = 255; i > 0; i--) { const j = (rnd() * (i + 1)) | 0, t = p[i]; p[i] = p[j]; p[j] = t; }
+  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+  const G = [[1, 1], [-1, 1], [1, -1], [-1, -1], [1, 0], [-1, 0], [0, 1], [0, -1]];
+  const fade = t => t * t * t * (t * (6 * t - 15) + 10);
+  return function (x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const X = xi & 255, Y = yi & 255, xf = x - xi, yf = y - yi;
+    const u = fade(xf), v = fade(yf);
+    const g = (h, dx, dy) => { const q = G[h & 7]; return q[0] * dx + q[1] * dy; };
+    const aa = perm[perm[X] + Y], ab = perm[perm[X] + Y + 1];
+    const ba = perm[perm[X + 1] + Y], bb = perm[perm[X + 1] + Y + 1];
+    return lerp(lerp(g(aa, xf, yf), g(ba, xf - 1, yf), u),
+                lerp(g(ab, xf, yf - 1), g(bb, xf - 1, yf - 1), u), v);
+  };
+}
+function fbm(n, x, y, oct, lac, gain) {
+  let a = .5, f = 1, s = 0, m = 0;
+  for (let i = 0; i < (oct || 4); i++) { s += a * n(x * f, y * f); m += a; a *= (gain || .5); f *= (lac || 2); }
+  return s / m;                                    /* −1 … 1 */
+}
+
+/* ------------------------------------------------------------ 1 · canvas */
+function cvs(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+const hex = (r, g, b) => 'rgb(' + (r | 0) + ',' + (g | 0) + ',' + (b | 0) + ')';
+
+/* stacked, up-scaled value noise — 30× faster than a per-pixel fbm and
+   indistinguishable once it is multiplied under a dark base colour */
+function fbmCanvas(W, H, seed, octaves, baseCells, contrast) {
+  const out = cvs(W, H), o = out.getContext('2d');
+  o.fillStyle = '#808080'; o.fillRect(0, 0, W, H);
+  let cells = baseCells || 3, alpha = 1;
+  for (let i = 0; i < (octaves || 5); i++) {
+    const n = cvs(cells, cells), nx = n.getContext('2d');
+    const im = nx.createImageData(cells, cells), d = im.data, r = mulberry32(seed + i * 977);
+    for (let k = 0; k < cells * cells; k++) {
+      const v = 128 + (r() - .5) * 255 * (contrast || 1);
+      d[k * 4] = d[k * 4 + 1] = d[k * 4 + 2] = clamp(v, 0, 255); d[k * 4 + 3] = 255;
+    }
+    nx.putImageData(im, 0, 0);
+    o.globalAlpha = alpha;
+    o.globalCompositeOperation = i === 0 ? 'source-over' : 'overlay';
+    o.imageSmoothingEnabled = true; o.imageSmoothingQuality = 'high';
+    o.drawImage(n, 0, 0, W, H);
+    cells *= 2; alpha *= .62;
+  }
+  o.globalAlpha = 1; o.globalCompositeOperation = 'source-over';
+  return out;
+}
+
+/* height → tangent-space normal map (blur first, then Sobel) */
+function normalFromHeight(hc, strength) {
+  const W = hc.width, H = hc.height;
+  const b = cvs(W, H), bx = b.getContext('2d');
+  bx.filter = 'blur(1.1px)'; bx.drawImage(hc, 0, 0); bx.filter = 'none';
+  const src = bx.getImageData(0, 0, W, H).data;
+  const out = cvs(W, H), ox = out.getContext('2d');
+  const im = ox.createImageData(W, H), d = im.data;
+  const at = (x, y) => src[(((y + H) % H) * W + ((x + W) % W)) * 4] / 255;
+  const s = strength || 2.4;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const gx = (at(x + 1, y) - at(x - 1, y)) * s;
+    const gy = (at(x, y + 1) - at(x, y - 1)) * s;
+    let nx = -gx, ny = gy, nz = 1;
+    const il = 1 / Math.hypot(nx, ny, nz);
+    const i = (y * W + x) * 4;
+    d[i]     = (nx * il * .5 + .5) * 255;
+    d[i + 1] = (ny * il * .5 + .5) * 255;
+    d[i + 2] = (nz * il * .5 + .5) * 255;
+    d[i + 3] = 255;
+  }
+  ox.putImageData(im, 0, 0);
+  return out;
+}
+
+/* --------------------------------------------------------- 2 · surfaces */
+
+/* ------------------------------------------------- the grid · the ground
+   The floor is one canvas cell, wrapped: the repeat does the tiling, so the
+   whole digital ground costs a single 512² upload. The line sits on the
+   cell's left and top edges; the wrap closes the rest. A faint red tick at
+   each origin is the one place the accent is allowed to repeat. */
+function texGrid() {
+  const S = 512, c = cvs(S, S), x = c.getContext('2d');
+  x.fillStyle = '#07080a'; x.fillRect(0, 0, S, S);
+  /* cell edges — clean and bright, no mottle: at this tiling the mip chain
+     averages any noise on the canvas into a wash that buries the lines */
+  x.fillStyle = 'rgba(168,180,196,.95)';
+  x.fillRect(0, 0, S, 3);
+  x.fillRect(0, 0, 3, S);
+  /* the red origin tick */
+  x.fillStyle = 'rgba(224,35,28,.42)';
+  x.fillRect(0, 0, 14, 3); x.fillRect(0, 0, 3, 14);
+  return c;
+}
+
+/* ------------------------------- brushed panel · the monolith's skin
+   Dark metal with a directional grain: long vertical strokes at two tones,
+   a band of panel seams, and just enough fbm to keep the mottling from
+   reading as noise. The height field carries the seams only. */
+function texPanel() {
+  const W = 512, H = 512;
+  const c = cvs(W, H), x = c.getContext('2d');
+  const h = cvs(W, H), hx = h.getContext('2d');
+  const rnd = mulberry32(131);
+  x.fillStyle = '#0c0e11'; x.fillRect(0, 0, W, H);
+  hx.fillStyle = '#808080'; hx.fillRect(0, 0, W, H);
+
+  /* the brush — vertical, uneven, mostly darker */
+  for (let i = 0; i < 260; i++) {
+    const sx = rnd() * W, w = .6 + rnd() * 2.2;
+    const dark = rnd() > .4;
+    x.fillStyle = dark ? 'rgba(0,0,0,' + (.05 + rnd() * .12).toFixed(2) + ')'
+                       : 'rgba(178,190,204,' + (.03 + rnd() * .07).toFixed(2) + ')';
+    x.fillRect(sx, 0, w, H);
+  }
+  /* panel seams every eighth */
+  for (let i = 1; i < 8; i++) {
+    const y = (H / 8) * i;
+    x.fillStyle = 'rgba(0,0,0,.5)'; x.fillRect(0, y - 1, W, 2.2);
+    x.fillStyle = 'rgba(190,200,212,.06)'; x.fillRect(0, y + 1.4, W, 1.4);
+    hx.fillStyle = '#3a3a3a'; hx.fillRect(0, y - 1.4, W, 2.8);
+  }
+  /* mottling */
+  x.globalCompositeOperation = 'overlay'; x.globalAlpha = .5;
+  x.drawImage(fbmCanvas(W, H, 313, 5, 4, 1), 0, 0);
+  x.globalAlpha = 1; x.globalCompositeOperation = 'source-over';
+  return { map: c, normal: normalFromHeight(h, 1.6) };
+}
+
+/* -------------------------------------------- fluted column · the pylons */
+function texPylon() {
+  const W = 256, H = 256, c = cvs(W, H), x = c.getContext('2d');
+  x.fillStyle = '#0a0c0f'; x.fillRect(0, 0, W, H);
+  /* vertical flutes: each pair is a dark groove with a lit shoulder */
+  for (let i = 0; i < W; i += 16) {
+    const g = x.createLinearGradient(i, 0, i + 16, 0);
+    g.addColorStop(0, 'rgba(0,0,0,.55)');
+    g.addColorStop(.42, 'rgba(146,158,172,.12)');
+    g.addColorStop(.8, 'rgba(70,80,92,.05)');
+    g.addColorStop(1, 'rgba(0,0,0,.55)');
+    x.fillStyle = g; x.fillRect(i, 0, 16, H);
+  }
+  x.globalCompositeOperation = 'overlay'; x.globalAlpha = .4;
+  x.drawImage(fbmCanvas(W, H, 97, 4, 4, 1), 0, 0);
+  x.globalAlpha = 1; x.globalCompositeOperation = 'source-over';
+  return c;
+}
+
+/* the sky itself: black at altitude, going to the fog colour at the horizon
+   so the backdrop and the depth cue meet without a seam — plus a faint red
+   bloom behind the core, as if something out there is powered on */
+function texSky() {
+  const W = 512, H = 512, c = cvs(W, H), x = c.getContext('2d');
+  const g = x.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, 'rgb(4,4,7)');      g.addColorStop(.34, 'rgb(8,9,13)');
+  g.addColorStop(.66, 'rgb(11,12,16)'); g.addColorStop(.88, 'rgb(14,15,19)');
+  g.addColorStop(1, 'rgb(7,7,10)');
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  /* the red horizon bloom, dead centre — the core's sky stain */
+  const wg = x.createRadialGradient(W * .5, H * .78, 4, W * .5, H * .78, W * .42);
+  wg.addColorStop(0, 'rgba(150,30,20,.22)'); wg.addColorStop(.5, 'rgba(96,20,14,.09)');
+  wg.addColorStop(1, 'rgba(0,0,0,0)');
+  x.fillStyle = wg; x.fillRect(0, 0, W, H);
+  /* a scatter of stars, faint enough to survive the bloom */
+  const rnd = mulberry32(881);
+  for (let i = 0; i < 380; i++) {
+    const sx = rnd() * W, sy = rnd() * H * .72, r = .5 + rnd() * rnd() * 1.6;
+    x.fillStyle = 'rgba(220,230,240,' + (.10 + rnd() * .40) * (1 - sy / H) + ')';
+    x.beginPath(); x.arc(sx, sy, r, 0, TAU); x.fill();
+  }
+  return c;
+}
+
+/* the far skyline the world closes with — black, ragged, mostly fog.
+   Towers, blocks and a few antenna spikes, drawn as one silhouette. */
+function texRidge() {
+  const W = 2048, H = 512, c = cvs(W, H), x = c.getContext('2d');
+  const n = noise2D(1207), rnd = mulberry32(1207);
+  x.fillStyle = '#040507';
+  /* a broken skyline: blocks of varying height with a noise-driven top */
+  let bx = 0;
+  while (bx < W) {
+    const bw = 30 + rnd() * 110;
+    const t = bx / W;
+    const base = .34 + .22 * (fbm(n, t * 3.1, .5, 4, 2.1, .55) * .5 + .5);
+    const bh = H * (base + rnd() * .18);
+    x.fillRect(bx, H - bh, bw, bh);
+    /* the odd roof spike */
+    if (rnd() > .72) {
+      const sw = 1.6 + rnd() * 2.4, sh = 12 + rnd() * 46;
+      x.fillRect(bx + bw * (.2 + rnd() * .6), H - bh - sh, sw, sh);
+    }
+    bx += bw + rnd() * 24;
+  }
+  /* antenna forest on the low ground between blocks */
+  for (let i = 0; i < 90; i++) {
+    const px = rnd() * W, sh = 6 + rnd() * 26;
+    x.fillRect(px, H - sh - 4, 1.2 + rnd() * 1.4, sh);
+  }
+  return c;
+}
+
+/* soft round falloff — haze, glows, beacons */
+function texGlow(inner, mid) {
+  const S = 256, c = cvs(S, S), x = c.getContext('2d');
+  const g = x.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+  g.addColorStop(0, inner || 'rgba(255,255,255,1)');
+  g.addColorStop(.28, mid || 'rgba(255,255,255,.36)');
+  g.addColorStop(.62, 'rgba(255,255,255,.07)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fillRect(0, 0, S, S);
+  return c;
+}
+
+/* one wisp — a round mote, not a streak. The whole read is a hard bright
+   point sitting in a soft halo, so the falloff is deliberately uneven. */
+function texWisp() {
+  const S = 128, c = cvs(S, S), x = c.getContext('2d');
+  const g = x.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+  g.addColorStop(0,   'rgba(255,255,255,1)');      /* the point itself */
+  g.addColorStop(.07, 'rgba(238,242,246,.92)');
+  g.addColorStop(.16, 'rgba(196,206,216,.40)');
+  g.addColorStop(.34, 'rgba(150,164,180,.13)');
+  g.addColorStop(.62, 'rgba(110,126,146,.035)');
+  g.addColorStop(1,   'rgba(96,110,130,0)');
+  x.fillStyle = g; x.fillRect(0, 0, S, S);
+  return c;
+}
+
+/* the data mote — a colder, smaller cousin of the wisp for the field */
+function texDot() {
+  const S = 64, c = cvs(S, S), x = c.getContext('2d');
+  const g = x.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(.3, 'rgba(255,255,255,.32)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fillRect(0, 0, S, S);
+  return c;
+}
+
+/* ---------------------------------------- the near silhouette sheets
+   These are the "transparent PNG" layers: dark structures painted at high
+   resolution with a ragged alpha edge, hung in front of the type as real
+   geometry so they parallax and sway.                                    */
+function texAntennaSheet() {
+  const W = 1024, H = 1024, c = cvs(W, H), x = c.getContext('2d');
+  const rnd = mulberry32(55);
+  x.fillStyle = '#050608';
+  /* a lattice mast: two converging legs and rungs */
+  const x0 = W * .36, x1 = W * .52, top = H * .06, foot = H * .97;
+  x.beginPath();
+  x.moveTo(x0, foot); x.lineTo(x0 + (x1 - x0) * .32, top);
+  x.lineTo(x0 + (x1 - x0) * .42, top); x.lineTo(x1, foot);
+  x.closePath(); x.fill();
+  for (let i = 0; i < 14; i++) {
+    const t = i / 13, y = foot + (top - foot) * t;
+    const lx = x0 + (x0 + (x1 - x0) * .37 - x0) * t, rx = x1 - (x1 - (x0 + (x1 - x0) * .37)) * t;
+    x.fillRect(lx, y, rx - lx, 6 + rnd() * 5);
+  }
+  /* the whip antenna above the mast */
+  x.fillRect(W * .445, 0, 5, H * .1);
+  /* its beacon, baked in — the one warm pixel on the sheet */
+  const bg = x.createRadialGradient(W * .448, H * .075, 1, W * .448, H * .075, 26);
+  bg.addColorStop(0, 'rgba(255,64,46,.95)'); bg.addColorStop(.4, 'rgba(190,30,18,.4)');
+  bg.addColorStop(1, 'rgba(120,16,10,0)');
+  x.fillStyle = bg; x.beginPath(); x.arc(W * .448, H * .075, 26, 0, TAU); x.fill();
+  /* a low equipment bunker at the foot */
+  x.fillRect(W * .18, H * .88, W * .5, H * .12);
+  return c;
+}
+function texSpireSheet() {
+  const W = 768, H = 1024, c = cvs(W, H), x = c.getContext('2d');
+  x.fillStyle = '#050608';
+  /* an obelisk with a broken tip */
+  x.beginPath();
+  x.moveTo(W * .30, H); x.lineTo(W * .40, H * .07);
+  x.lineTo(W * .47, H * .16); x.lineTo(W * .56, H * .10);
+  x.lineTo(W * .68, H); x.closePath(); x.fill();
+  /* a lit edge on the left face */
+  x.strokeStyle = 'rgba(170,182,198,.28)'; x.lineWidth = 3;
+  x.beginPath(); x.moveTo(W * .30, H); x.lineTo(W * .40, H * .07); x.stroke();
+  /* ring bands, faint */
+  for (let i = 1; i < 6; i++) {
+    const y = H * (i / 6);
+    x.fillStyle = 'rgba(0,0,0,.6)';
+    x.fillRect(W * .30 + (W * .38 - W * .30) * (y / H), y, W * .38, 4);
+  }
+  return c;
+}
+function texDishSheet() {
+  const W = 1024, H = 640, c = cvs(W, H), x = c.getContext('2d');
+  x.fillStyle = '#050608';
+  /* pedestal + tilted dish, drawn edge-on as a lens shape */
+  x.fillRect(W * .47, H * .55, W * .06, H * .45);
+  x.beginPath();
+  x.ellipse(W * .5, H * .42, W * .34, H * .18, -.32, 0, TAU);
+  x.fill();
+  x.strokeStyle = 'rgba(160,172,188,.10)'; x.lineWidth = 3;
+  x.beginPath();
+  x.ellipse(W * .5, H * .42, W * .34, H * .18, -.32, 0, TAU);
+  x.stroke();
+  return c;
+}
+function texBlocksSheet() {
+  const W = 1536, H = 640, c = cvs(W, H), x = c.getContext('2d');
+  const rnd = mulberry32(88);
+  x.fillStyle = '#050608';
+  let bx = 0;
+  while (bx < W) {
+    const bw = 60 + rnd() * 160, bh = H * (.3 + rnd() * .55);
+    x.fillRect(bx, H - bh, bw, bh);
+    if (rnd() > .6) x.fillRect(bx + bw * .4, H - bh - (10 + rnd() * 40), 3, 60);
+    bx += bw + 8 + rnd() * 30;
+  }
+  return c;
+}
+function texGridPanelSheet() {
+  const W = 1024, H = 512, c = cvs(W, H), x = c.getContext('2d');
+  x.fillStyle = '#050608'; x.fillRect(0, 0, W, H);
+  /* a floating pane of glass carrying the same grid as the floor */
+  x.strokeStyle = 'rgba(150,162,176,.26)'; x.lineWidth = 2;
+  for (let i = 0; i <= 16; i++) {
+    x.beginPath(); x.moveTo(W / 16 * i, 0); x.lineTo(W / 16 * i, H); x.stroke();
+  }
+  for (let j = 0; j <= 8; j++) {
+    x.beginPath(); x.moveTo(0, H / 8 * j); x.lineTo(W, H / 8 * j); x.stroke();
+  }
+  /* one red cell, dead centre */
+  x.fillStyle = 'rgba(224,35,28,.40)';
+  x.fillRect(W / 16 * 7.5, H / 8 * 3.5, W / 16, H / 8);
+  return c;
+}
+
+/* ================================================================= 3 · gl */
+const canvas = document.getElementById('gl');
+/* The layout viewport, not the window. On mobile `innerWidth` follows the
+   initial containing block, which can run wider than the visual viewport,
+   while `clientWidth` tracks what CSS actually lays out against. Every
+   size, aspect and pointer mapping below goes through these. */
+const vpW = () => document.documentElement.clientWidth  || innerWidth;
+const vpH = () => document.documentElement.clientHeight || innerHeight;
+let renderer, scene, camera, maxAniso = 1;
+const HI = qs('q', COARSE ? 'low' : 'high');
+const LOW = HI === 'low';
+const WANT_POST    = qs('post', '1') !== '0';
+const WANT_SHADOW  = qs('shadow', LOW ? '0' : '1') !== '0';
+const DPR_CAP      = qn('dpr', LOW ? 1.4 : 1.8);
+/* the renderer trades resolution for frame rate on its own — the scene is
+   fill-bound (the veils plus a bloom chain), so pixels are the only knob
+   worth turning on unknown hardware */
+const PERF = { scale: 1, acc: 0, n: 0, locked: qs('adapt', '1') === '0' };
+
+function initGL() {
+  if (qs('nogl', '0') !== '0' || !window.THREE) throw new Error('webgl disabled');
+  renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: !WANT_POST, alpha: false, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, DPR_CAP));
+  /* updateStyle stays on: the stylesheet sizes the canvas at 100% of the
+     initial containing block, which is the very box that runs wide on a
+     phone. Writing the CSS size in pixels pins the element to the layout
+     viewport the buffer was built for. */
+  renderer.setSize(vpW(), vpH(), true);
+  renderer.outputEncoding = WANT_POST ? THREE.LinearEncoding : THREE.sRGBEncoding;
+  renderer.toneMapping = WANT_POST ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+  renderer.setClearColor(0x050505, 1);
+
+  if (WANT_SHADOW) { renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; }
+  maxAniso = renderer.capabilities.getMaxAnisotropy();
+  scene = new THREE.Scene();
+  /* Density puts the core back in the air; the colour decides how dark it is
+     back there. At this depth most of a distant object's pixel is fog rather
+     than its own material — and it reaches by distance, so the foreground
+     does not follow it down. */
+  scene.fog = new THREE.FogExp2(0x050505, 0.0172);
+  scene.background = new THREE.Color(0x060607);
+  camera = new THREE.PerspectiveCamera(36, vpW() / vpH(), .35, 220);
+  scene.add(camera);
+}
+
+function tx(canvasEl, o) {
+  o = o || {};
+  const t = new THREE.CanvasTexture(canvasEl);
+  t.wrapS = t.wrapT = o.wrap || THREE.ClampToEdgeWrapping;
+  if (o.repeat) t.repeat.set(o.repeat[0], o.repeat[1]);
+  t.anisotropy = Math.min(o.aniso || 8, maxAniso);
+  if (o.srgb !== false) t.encoding = THREE.sRGBEncoding;
+  t.needsUpdate = true;
+  return t;
+}
+/* HDR-bright emitters: values above 1 survive because the scene is rendered
+   into a half-float buffer, and they are what the bloom feeds on */
+const hdr = (r, g, b) => new THREE.Color().setRGB(r, g, b);
+
+/* A standard material hung at one tiling. */
+function surface(t, rep, o) {
+  o = o || {};
+  const wrap = THREE.RepeatWrapping, aniso = o.aniso || 8;
+  const m = new THREE.MeshStandardMaterial({
+    map: tx(t.map, { wrap: wrap, repeat: rep, aniso: aniso }),
+    normalMap: tx(t.normal, { wrap: wrap, repeat: rep, srgb: false, aniso: aniso }),
+    normalScale: new THREE.Vector2(o.normal === undefined ? .8 : o.normal,
+                                   o.normal === undefined ? .8 : o.normal),
+    color: o.color === undefined ? 0xffffff : o.color,
+    roughness: o.roughness === undefined ? 1 : o.roughness,
+    metalness: o.metalness === undefined ? .02 : o.metalness
+  });
+  if (t.rough) m.roughnessMap = tx(t.rough, { wrap: wrap, repeat: rep, srgb: false });
+  return m;
+}
+/* The texture libraries are generated once and shared. */
+const LIB = {};
+const lib = (k, f) => (LIB[k] || (LIB[k] = f()));
+
+function mergeGeos(list) {
+  let vN = 0, iN = 0;
+  list.forEach(g => { vN += g.attributes.position.count; iN += g.index.count; });
+  const pos = new Float32Array(vN * 3), nor = new Float32Array(vN * 3), uv = new Float32Array(vN * 2);
+  const idx = vN > 65535 ? new Uint32Array(iN) : new Uint16Array(iN);
+  let vo = 0, io = 0;
+  list.forEach(g => {
+    pos.set(g.attributes.position.array, vo * 3);
+    nor.set(g.attributes.normal.array, vo * 3);
+    uv.set(g.attributes.uv.array, vo * 2);
+    const gi = g.index.array;
+    for (let i = 0; i < gi.length; i++) idx[io + i] = gi[i] + vo;
+    io += gi.length; vo += g.attributes.position.count;
+    g.dispose();
+  });
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  out.setIndex(new THREE.BufferAttribute(idx, 1));
+  return out;
+}
+
+/* ========================================================== 4 · the world */
+const WORLD = {};                 /* named handles the page can animate */
+const swayers = [];               /* things the drift touches */
+
+/* ---- the site plan, in metres ----------------------------------------
+   Everything downstream — camera waypoints, the pylon lanes, the core — is
+   pinned to these, so the world can be re-proportioned in one place.
+   The camera walks in from +z and travels toward −z.                     */
+const CORE = { x: 0, y: 9.0, z: -66, r: 4.6 };                 /* the eclipse */
+const MONO = { x: 0, y: 4.8, z: -40, w: 7.2, h: 9.6, d: 2.2 }; /* the monolith */
+const LANE_1 = { z: -27 };                                      /* pylon lane A */
+const LANE_2 = { z: -33 };                                      /* pylon lane B */
+
+function buildShell() {
+  /* the digital ground: a dark, faintly metallic plane carrying the grid as
+     an emissive map, so the lines glow through the standard pipeline, take
+     the fog with distance, and cost one 512² texture */
+  /* one canvas, two textures: the colour map and its own emissive readout */
+  const gridC = texGrid();
+  const gridMat = new THREE.MeshStandardMaterial({
+    map: tx(gridC, { wrap: THREE.RepeatWrapping, repeat: [34, 26], aniso: 16 }),
+    color: 0x14161a, roughness: .38, metalness: .58,
+    emissive: new THREE.Color(0xffffff),
+    emissiveMap: tx(gridC, { wrap: THREE.RepeatWrapping, repeat: [34, 26], srgb: false, aniso: 16 }),
+    emissiveIntensity: .62,
+    normalScale: new THREE.Vector2(.2, .2)
+  });
+  WORLD.gridMat = gridMat;
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(280, 200), gridMat);
+  floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0, -24); floor.receiveShadow = true;
+  scene.add(floor);
+  WORLD.floor = floor;
+
+  /* the sky, hung far enough back that the whole frustum sits inside it */
+  const sky = new THREE.Mesh(new THREE.PlaneGeometry(380, 210),
+    new THREE.MeshBasicMaterial({ color: hdr(.58, .62, .70), map: tx(texSky()),
+      depthWrite: false, fog: false, toneMapped: false }));
+  sky.position.set(0, 60, -118); sky.renderOrder = 0; scene.add(sky);
+  WORLD.sky = sky;
+
+  /* the skyline that closes the world — three-quarters eaten by fog, which
+     is the only reason the ground plane can just stop out there */
+  const ridgeMap = tx(texRidge(), { wrap: THREE.RepeatWrapping, repeat: [1.7, 1] });
+  [[-108, 10, 320, 30, 0], [-86, 7.5, 230, 21, 18]].forEach((r, i) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(r[2], r[3]),
+      /* fog off: at a hundred metres it would lift a black silhouette to 80%
+         of the fog colour, and the skyline came back as a *pale* band */
+      new THREE.MeshBasicMaterial({ map: i ? tx(texRidge()) : ridgeMap, transparent: true,
+        color: i ? 0x07080b : 0x040507, depthWrite: false, fog: false }));
+    m.position.set(r[4], r[1], r[0]); m.renderOrder = 1; scene.add(m);
+  });
+}
+
+/* ------------------------------------------------------------- the core
+   A black disc eclipsing its own glow: an inner halo behind, a disc that is
+   darker than the sky in front of it, a wide corona over everything, and a
+   thin red ring drawn at the radius where the corona meets the halo. The
+   group billboards to the camera every frame, so the whole assembly reads
+   correctly from any point on the walk.                                    */
+function buildCore() {
+  const g = new THREE.Group();
+  g.position.set(CORE.x, CORE.y, CORE.z);
+  const inner = new THREE.Mesh(new THREE.PlaneGeometry(CORE.r * 5.4, CORE.r * 5.4),
+    new THREE.MeshBasicMaterial({ map: tx(texGlow('rgba(255,74,52,.90)', 'rgba(168,26,16,.30)')),
+      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, opacity: .5 }));
+  inner.position.z = -.5; inner.renderOrder = 0; g.add(inner);
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(CORE.r * .92, 64),
+    new THREE.MeshBasicMaterial({ color: hdr(.015, .016, .02), fog: false, toneMapped: false }));
+  disc.renderOrder = 1; g.add(disc);
+  const corona = new THREE.Mesh(new THREE.PlaneGeometry(CORE.r * 13, CORE.r * 13),
+    new THREE.MeshBasicMaterial({ map: tx(texGlow('rgba(255,44,28,.50)', 'rgba(140,18,10,.16)')),
+      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, opacity: .22 }));
+  corona.position.z = .5; corona.renderOrder = 2; g.add(corona);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(CORE.r * 1.06, .05, 8, 110),
+    new THREE.MeshBasicMaterial({ color: hdr(4.8, .13, .08), fog: false, toneMapped: false }));
+  ring.position.z = .35; ring.renderOrder = 3; g.add(ring);
+  scene.add(g);
+  WORLD.core = g; WORLD.coreHalo = inner; WORLD.coreRing = ring;
+}
+
+/* ---------------------------------------------------------- the monolith
+   A single dark slab standing in the lane: brushed metal that stays nearly a
+   silhouette until a light crosses it, then throws a moving highlight. The
+   red seam down its face is the accent of the whole world — the one place
+   the colour is allowed to burn.                                          */
+function buildMonolith() {
+  const t = texPanel();
+  const mat = new THREE.MeshStandardMaterial({
+    map: tx(t.map, { wrap: THREE.RepeatWrapping, repeat: [1.6, 2.6] }),
+    normalMap: tx(t.normal, { wrap: THREE.RepeatWrapping, repeat: [1.6, 2.6], srgb: false }),
+    normalScale: new THREE.Vector2(.6, .6),
+    color: 0xb4bcc6, roughness: .34, metalness: .85
+  });
+  const mono = new THREE.Mesh(new THREE.BoxGeometry(MONO.w, MONO.h, MONO.d), mat);
+  mono.position.set(MONO.x, MONO.y, MONO.z);
+  mono.castShadow = true; mono.receiveShadow = true;
+  scene.add(mono); WORLD.monolith = mono;
+
+  const seam = new THREE.Mesh(new THREE.BoxGeometry(.12, MONO.h * .8, .06),
+    new THREE.MeshBasicMaterial({ color: hdr(4.6, .12, .08), transparent: true,
+      opacity: .92, toneMapped: false }));
+  seam.position.set(MONO.x, MONO.y, MONO.z + MONO.d / 2 + .04);
+  scene.add(seam); WORLD.monSeam = seam;
+
+  const plinth = new THREE.Mesh(new THREE.BoxGeometry(MONO.w + 1.6, .5, MONO.d + 1.4),
+    new THREE.MeshStandardMaterial({ color: 0x0a0c0e, roughness: .9, metalness: .2 }));
+  plinth.position.set(MONO.x, .25, MONO.z);
+  plinth.receiveShadow = true; plinth.castShadow = true; scene.add(plinth);
+}
+
+/* ------------------------------------------------------ the skill pylons
+   Eleven markers in two lanes, one per skill row. Each carries a thin
+   emissive seam; the seams share geometry but own their materials, so a
+   hover can light one pylon without touching the rest. The seams are what
+   the skill rows talk to — no DOM is read inside the render loop.         */
+function buildPylons() {
+  const mat = new THREE.MeshStandardMaterial({
+    map: tx(texPylon(), { wrap: THREE.RepeatWrapping, repeat: [1, 2] }),
+    color: 0x191c21, roughness: .58, metalness: .62
+  });
+  const seamCool = new THREE.Color(2.1, 2.2, 2.4), seamHot = new THREE.Color(4.8, .14, .09);
+  WORLD.seamCool = seamCool; WORLD.seamHot = seamHot;
+  const seamGeo = new THREE.BoxGeometry(.075, 1, .05);
+  WORLD.pylonSeams = [];
+  const lanes = [
+    { z: LANE_1.z, xs: [-10.5, -6.3, -2.1, 2.1, 6.3, 10.5], base: 3.6 },
+    { z: LANE_2.z, xs: [-8.4, -4.2, 0, 4.2, 8.4],           base: 3.1 }
+  ];
+  let i = 0;
+  lanes.forEach(l => l.xs.forEach(x => {
+    const h = l.base + (i % 3) * .42 + (i % 2) * .3;
+    const p = new THREE.Mesh(new THREE.BoxGeometry(.52, h, .52), mat);
+    p.position.set(x, h / 2, l.z); p.castShadow = true; p.receiveShadow = true;
+    scene.add(p);
+    const sm = new THREE.MeshBasicMaterial({ color: seamCool.clone(), transparent: true,
+      opacity: .5, toneMapped: false });
+    sm.userData = { a: 0 };
+    const s = new THREE.Mesh(seamGeo, sm);
+    s.scale.y = h * .84;
+    s.position.set(x, h / 2, l.z + .28); scene.add(s);
+    WORLD.pylonSeams.push(sm);
+    i++;
+  }));
+}
+
+/* ------------------------------------------------------------ the artifacts
+   Antenna towers with pulsing beacons, and a handful of free-floating shards
+   that drift on their own clocks. All of it is set dressing that stays in
+   the fog's care — nothing here needs a light of its own.                  */
+function buildArtifacts() {
+  const dark = new THREE.MeshStandardMaterial({ color: 0x0b0d10, roughness: .92, metalness: .18 });
+  const rnd = mulberry32(404);
+  WORLD.beacons = [];
+  WORLD.shards = [];
+
+  const towers = [[-11.5, -17.5, 8.6], [12.4, -25.0, 10.2]];
+  towers.forEach((t, ti) => {
+    const parts = [];
+    for (let i = 0; i < 3; i++) {
+      const a = ti * 1.1 + i * TAU / 3, r = .34;
+      parts.push(new THREE.CylinderGeometry(.05, .07, t[2], 6)
+        .translate(Math.cos(a) * r, t[2] / 2, Math.sin(a) * r));
+    }
+    const rings = 5;
+    for (let i = 1; i <= rings; i++) {
+      const y = t[2] * i / (rings + .4);
+      const rr = .55 * (1 - i / (rings + 2));
+      parts.push(new THREE.TorusGeometry(rr, .022, 5, 18).rotateX(Math.PI / 2).translate(0, y, 0));
+    }
+    parts.push(new THREE.CylinderGeometry(.30, .02, .8, 6).translate(0, t[2] + .4, 0));
+    const m = new THREE.Mesh(mergeGeos(parts), dark);
+    m.position.set(t[0], 0, t[1]); m.castShadow = true; scene.add(m);
+    const b = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.6),
+      new THREE.MeshBasicMaterial({ map: tx(texGlow('rgba(255,70,52,1)', 'rgba(180,24,16,.32)')),
+        transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, opacity: .5 }));
+    b.position.set(t[0], t[2] + .95, t[1]); b.renderOrder = 3; scene.add(b);
+    b.userData.ph = ti * 2.3; WORLD.beacons.push(b);
+  });
+
+  const shardMat = new THREE.MeshStandardMaterial({ color: 0x111318, roughness: .38, metalness: .78, flatShading: true });
+  const shards = [[-4.2, 4.9, -21.0, .8], [5.1, 6.4, -27.5, 1.15], [-6.0, 3.4, -29.0, .65],
+                  [3.4, 8.6, -35.0, .9], [-2.6, 7.2, -37.5, .7], [7.0, 4.2, -18.5, .55]];
+  shards.forEach((s, i) => {
+    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(s[3], 0), shardMat);
+    m.position.set(s[0], s[1], s[2]);
+    m.rotation.set(rnd() * TAU, rnd() * TAU, rnd() * TAU);
+    m.userData = { ph: rnd() * TAU, sp: .16 + rnd() * .22, y0: s[1] };
+    scene.add(m); WORLD.shards.push(m);
+  });
+}
+
+/* ------------------------------- the near silhouette sheets ------------- */
+function cutoutMaterial(canvasEl, sway) {
+  const mat = new THREE.MeshBasicMaterial({
+    map: tx(canvasEl, { aniso: 16 }), transparent: true, depthWrite: true,
+    alphaTest: .012, side: THREE.DoubleSide, fog: true, color: 0xffffff
+  });
+  mat.onBeforeCompile = sh => {
+    sh.uniforms.uT = WORLD.uT;
+    sh.uniforms.uSway = { value: sway || .05 };
+    sh.vertexShader = 'uniform float uT;\nuniform float uSway;\n' + sh.vertexShader.replace(
+      '#include <begin_vertex>',
+      '#include <begin_vertex>\n' +
+      'float h = uv.y;\n' +
+      'float ph = position.x*0.30;\n' +
+      'transformed.x += sin(uT*0.85 + ph)*uSway*h*h;\n' +
+      'transformed.y += cos(uT*0.62 + ph*1.7)*uSway*0.35*h*h;\n');
+    /* These sheets are drawn inside their own canvas with margin to spare, so
+       feathering the alpha at the edges lets each one dissolve into the fog
+       instead of ending on a hard line. */
+    sh.fragmentShader = sh.fragmentShader.replace('#include <alphatest_fragment>',
+      'float feX = smoothstep(0.0, 0.11, vUv.x) * (1.0 - smoothstep(0.89, 1.0, vUv.x));\n' +
+      'float feY = smoothstep(0.0, 0.07, vUv.y);\n' +
+      'diffuseColor.a *= feX * feY;\n' +
+      '#include <alphatest_fragment>');
+  };
+  return mat;
+}
+
+function buildForeground() {
+  /* the plane widths are sized against the frustum at their own depth: a
+     16-unit sheet a few metres from the lens only shows its middle */
+  const layers = [
+    /* name     canvas                 x      y     z       w     h    sway */
+    ['panel',   texGridPanelSheet(),   8.6,   3.6, -7.0,   16,   5,   .012],
+    ['antenna', texAntennaSheet(),    -5.8,   3.1,  3.6,    8.2, 10.6, .022],
+    ['spire',   texSpireSheet(),       5.8,   3.2,  4.8,    5.0, 11.4, .030],
+    ['dish',    texDishSheet(),        4.6,   5.0, -7.6,   11,   6.9, .016],
+    ['blocks',  texBlocksSheet(),     -1.0,   3.4, -10.8,  20,   7.2, .008]
+  ];
+  WORLD.fg = [];
+  layers.forEach(L => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(L[5], L[6], 12, 12), cutoutMaterial(L[1], L[7]));
+    m.position.set(L[2], L[3], L[4]);
+    m.renderOrder = 20 + WORLD.fg.length;
+    m.name = L[0];
+    m.frustumCulled = false;
+    scene.add(m);
+    WORLD.fg.push(m);
+  });
+}
+
+/* --------------------------------------------------- the giant wordmark */
+const WORD_Z = 3.0;
+function buildWordmark() {
+  /* The word is set to the frame width, so a short word is a *taller* word.
+     Wide tracking keeps the type edge to edge while the caps stay near the
+     height of the headline block. Set in Onest 400 — the heading face of
+     the whole site — so the giant word and the DOM headings are one voice. */
+  const SZ = 320, TRACK = .40, PAD = 26;
+  const m = cvs(4, 4).getContext('2d');
+  m.font = '400 ' + SZ + 'px Onest, sans-serif';
+  m.textBaseline = 'alphabetic'; m.textAlign = 'left';
+  const word = 'RAZER', gl = [];
+  let pen = 0, ascMax = 0, descMax = 0, xMin = 1e9, xMax = -1e9;
+  for (const ch of word) {
+    const t = m.measureText(ch);
+    const g = { ch: ch, adv: t.width, asc: t.actualBoundingBoxAscent, desc: t.actualBoundingBoxDescent,
+                l: t.actualBoundingBoxLeft, r: t.actualBoundingBoxRight, pen: pen };
+    gl.push(g);
+    ascMax = Math.max(ascMax, g.asc); descMax = Math.max(descMax, g.desc);
+    xMin = Math.min(xMin, pen - g.l); xMax = Math.max(xMax, pen + g.r);
+    pen += t.width + TRACK * SZ;
+  }
+  const group = new THREE.Group();
+  WORD.glyphs = [];
+  gl.forEach((g, i) => {
+    const cw = Math.ceil(g.l + g.r) + PAD * 2, chh = Math.ceil(g.asc + g.desc) + PAD * 2;
+    const c = cvs(cw, chh), x = c.getContext('2d');
+    x.font = '400 ' + SZ + 'px Onest, sans-serif';
+    x.textBaseline = 'alphabetic'; x.textAlign = 'left';
+    /* the vertical wash is baked per glyph so the whole word shares one ramp */
+    const gy0 = PAD + g.asc - ascMax, gy1 = PAD + g.asc + descMax * .4;
+    const grad = x.createLinearGradient(0, gy0, 0, gy1);
+    grad.addColorStop(0, 'rgb(242,244,246)');
+    grad.addColorStop(.52, 'rgb(202,208,214)');
+    grad.addColorStop(1, 'rgb(150,156,162)');
+    x.fillStyle = grad;
+    x.fillText(g.ch, PAD + g.l, PAD + g.asc);
+
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(cw, chh),
+      new THREE.MeshBasicMaterial({ map: tx(c, { aniso: 16 }), transparent: true,
+        depthWrite: false, side: THREE.DoubleSide, fog: true, opacity: 1 }));
+    mesh.position.set(g.pen + (g.r - g.l) / 2, (g.asc - g.desc) / 2, 0);
+    /* Above the near sheets (renderOrder 20+): the old composition could let
+       them overpaint the type because its foreground was bottom-anchored
+       grass — these mid-frame structures cross the word band, and the word is
+       the hero element. The sheets still frame it left and right. */
+    mesh.renderOrder = 30;
+    mesh.frustumCulled = false;
+    mesh.userData.baseY = mesh.position.y;
+    group.add(mesh);
+    WORD.glyphs.push(mesh);
+  });
+  group.position.z = WORD_Z;
+  scene.add(group);
+  WORD.group = group;
+  WORD.ink = { xMin: xMin, xMax: xMax, cx: (xMin + xMax) / 2, w: xMax - xMin, asc: ascMax };
+}
+const WORD = { glyphs: [], group: null, ink: null, reveal: 0 };
+
+/* --------------------------------------------------------- atmospherics */
+function buildAtmosphere() {
+  /* drifting haze slabs */
+  const hazeTex = tx(texGlow('rgba(160,178,196,.55)', 'rgba(110,130,152,.18)'));
+  WORLD.haze = [];
+  const rnd = mulberry32(66);
+  for (let i = 0; i < (LOW ? 4 : 6); i++) {
+    const s = 12 + rnd() * 15;
+    const h = new THREE.Mesh(new THREE.PlaneGeometry(s, s * .55),
+      new THREE.MeshBasicMaterial({ map: hazeTex, transparent: true, blending: THREE.AdditiveBlending,
+        depthWrite: false, fog: false, opacity: .05 + rnd() * .07 }));
+    h.position.set((rnd() - .5) * 44, 1.5 + rnd() * 10, -42 + rnd() * 44);
+    h.renderOrder = 4;
+    h.userData = { sp: .06 + rnd() * .12, ph: rnd() * TAU, x0: h.position.x };
+    scene.add(h); WORLD.haze.push(h);
+  }
+}
+
+/* ====================================================== 5 · the data motes
+   The field of drifting particles. It is anchored to the rig rather than to
+   the world: every mote keeps a real position so its drift is honest, but
+   any mote further than MOTE_R from the camera in x or z is wrapped back
+   across it. The count is what one screenful needs, and the frame is never
+   empty however far the walk goes. A small slice of the population is red —
+   data with the accent in it — the rest is cold silver.                    */
+const MOTE_AHEAD = 11, MOTE_SPREAD = 12, MOTE_R = 30;
+function buildMotes() {
+  const N = LOW ? 150 : 340;
+  const pos = new Float32Array(N * 3), seed = new Float32Array(N);
+  const rnd = mulberry32(77), list = [];
+  for (let i = 0; i < N; i++) {
+    list.push({ x: 0, y: 0, z: 0, rise: .10 + rnd() * .24, drift: .4 + rnd() * .8, ph: rnd() * TAU });
+    seed[i] = rnd();
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 1));
+  const pts = new THREE.Points(g, new THREE.ShaderMaterial({
+    uniforms: { uT: WORLD.uT, uTex: { value: tx(texDot()) }, uSize: { value: vpH() * .5 } },
+    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+    vertexShader:
+      'attribute float aSeed; uniform float uT; uniform float uSize; varying float vA; varying float vR;\n' +
+      'void main(){ vR = step(0.87, aSeed);\n' +
+      ' vec4 mv = modelViewMatrix * vec4(position, 1.0);\n' +
+      ' vA = 0.35 + 0.65 * (0.5 + 0.5 * sin(uT * (0.6 + aSeed * 1.4) + aSeed * 40.0));\n' +
+      ' gl_PointSize = uSize * (0.006 + aSeed * 0.012) / max(-mv.z, 0.6);\n' +
+      ' gl_Position = projectionMatrix * mv; }',
+    fragmentShader:
+      'uniform sampler2D uTex; varying float vA; varying float vR;\n' +
+      'void main(){ vec4 t = texture2D(uTex, gl_PointCoord);\n' +
+      ' vec3 col = mix(vec3(0.80,0.84,0.90), vec3(0.88,0.16,0.12), vR);\n' +
+      ' gl_FragColor = vec4(col, t.a * vA * 0.55); }'
+  }));
+  pts.frustumCulled = false; pts.renderOrder = 5;
+  scene.add(pts);
+  WORLD.motes = { mesh: pts, list: list, seeded: false };
+}
+const MOTE_F = new THREE.Vector3();
+function updateMotes(dt) {
+  const M = WORLD.motes; if (!M) return;
+  const P = M.mesh.geometry.attributes.position.array;
+  const cy = camera.position.y, L = M.list;
+  /* Recycle ahead of the rig, not around it — the cone the camera is actually
+     looking down is where the same count is worth several times more. */
+  camera.getWorldDirection(MOTE_F);
+  MOTE_F.y = 0;
+  if (MOTE_F.lengthSq() < 1e-6) MOTE_F.set(0, 0, -1); else MOTE_F.normalize();
+  const fx = camera.position.x + MOTE_F.x * MOTE_AHEAD;
+  const fz = camera.position.z + MOTE_F.z * MOTE_AHEAD;
+  const seedPass = !M.seeded; M.seeded = true;
+  for (let i = 0; i < L.length; i++) {
+    const mo = L[i], k = i * 3;
+    mo.y += mo.rise * dt;                       /* data drifts up, ash falls */
+    if (seedPass || mo.y > cy + 16) {
+      mo.y = seedPass ? cy - 10 + Math.random() * 26 : cy - 10;
+      const a = Math.random() * TAU, r = Math.sqrt(Math.random()) * MOTE_SPREAD;
+      mo.x = fx + Math.cos(a) * r;
+      mo.z = fz + Math.sin(a) * r;
+    }
+    /* the far wrap is a backstop for a rig that has walked away from its own
+       weather — it sits well outside the fog, so nothing is seen to jump */
+    if (mo.x - camera.position.x > MOTE_R) mo.x -= 2 * MOTE_R; else if (mo.x - camera.position.x < -MOTE_R) mo.x += 2 * MOTE_R;
+    if (mo.z - camera.position.z > MOTE_R) mo.z -= 2 * MOTE_R; else if (mo.z - camera.position.z < -MOTE_R) mo.z += 2 * MOTE_R;
+    P[k]     = mo.x + Math.sin(clock * .4 * mo.drift + mo.ph) * .8;
+    P[k + 1] = mo.y;
+    P[k + 2] = mo.z + Math.cos(clock * .33 * mo.drift + mo.ph) * .8;
+  }
+  M.mesh.geometry.attributes.position.needsUpdate = true;
+}
+
+/* ==================================================== 6 · the cursor wisps
+   A drift of cold motes that follows the pointer. It hangs as a child of the
+   camera, so the pointer maps straight into camera space, and emission is by
+   distance travelled rather than elapsed time — a slow hand lays a continuous
+   drift and a fast one throws the motes apart.                            */
+const WISP_D = 3.4;
+const WISP = { list: [], i: 0, acc: 0, ex: 0, ey: 0, lx: 0, ly: 0, idle: 0, seen: false };
+function buildWisps() {
+  if (COARSE) return;
+  const N = LOW ? 90 : 190;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
+  g.setAttribute('aA', new THREE.BufferAttribute(new Float32Array(N), 1));
+  g.setAttribute('aS', new THREE.BufferAttribute(new Float32Array(N), 1));
+  const pts = new THREE.Points(g, new THREE.ShaderMaterial({
+    uniforms: { uTex: { value: tx(texWisp()) }, uPx: { value: vpH() } },
+    transparent: true, blending: THREE.AdditiveBlending,
+    depthWrite: false, depthTest: false, fog: false,
+    vertexShader:
+      'attribute float aA; attribute float aS;\n' +
+      'uniform float uPx; varying float vA;\n' +
+      'void main(){ vA = aA;\n' +
+      ' vec4 mv = modelViewMatrix * vec4(position,1.0);\n' +
+      ' gl_PointSize = uPx * aS / max(-mv.z, 0.4);\n' +
+      ' gl_Position = projectionMatrix * mv; }',
+    fragmentShader:
+      'uniform sampler2D uTex; varying float vA;\n' +
+      'void main(){ if (vA <= 0.0) discard;\n' +
+      ' vec4 t = texture2D(uTex, gl_PointCoord);\n' +
+      ' gl_FragColor = vec4(t.rgb, t.a * vA); }'
+  }));
+  pts.frustumCulled = false; pts.renderOrder = 9;
+  pts.layers.set(1);                    /* near the lens: never in the cards */
+  camera.add(pts);
+  WISP.mesh = pts;
+  for (let i = 0; i < N; i++) WISP.list.push({ life: 0, max: 1, vx: 0, vy: 0, sz: 0, ph: 0 });
+}
+/* the pointer, in camera space, on the plane the trail hangs on */
+function wispPoint(nx, ny) {
+  const hh = Math.tan(camera.fov * Math.PI / 360) * WISP_D;
+  return [nx * hh * camera.aspect, ny * hh];
+}
+function updateWisps(dt) {
+  if (!WISP.mesh) return;
+  const g = WISP.mesh.geometry;
+  const P = g.attributes.position.array, A = g.attributes.aA.array;
+  const S = g.attributes.aS.array;
+  const L = WISP.list, N = L.length;
+
+  const pt = wispPoint(RIG.tmx, RIG.tmy);
+  if (!WISP.seen) { WISP.ex = WISP.lx = pt[0]; WISP.ey = WISP.ly = pt[1]; WISP.seen = true; }
+  /* the emitter trails the pointer slightly, which gives the drift its lag */
+  WISP.ex = damp(WISP.ex, pt[0], 16, dt);
+  WISP.ey = damp(WISP.ey, pt[1], 16, dt);
+
+  const dx = WISP.ex - WISP.lx, dy = WISP.ey - WISP.ly;
+  const moved = Math.hypot(dx, dy);
+  const ang = moved > 1e-5 ? Math.atan2(dy, dx) : 0;
+  const spawn = (x, y, a, weak) => {
+    const i = WISP.i; WISP.i = (i + 1) % N;
+    const w = L[i], k = i * 3;
+    P[k] = x + (Math.random() + Math.random() - 1) * .30;
+    P[k + 1] = y + (Math.random() + Math.random() - 1) * .30;
+    P[k + 2] = -WISP_D + (Math.random() - .5) * .9;
+    w.life = 0; w.max = (weak ? 2.1 : 1.45) + Math.random() * 1.3;
+    w.vx = -Math.cos(a) * .09 + (Math.random() - .5) * .38;
+    w.vy = -Math.sin(a) * .09 + (Math.random() - .5) * .32 + .02;
+    w.sz = (weak ? .018 : .024) + Math.random() * .026;
+    w.ph = Math.random() * TAU;
+  };
+
+  WISP.acc += moved;
+  const STEP = .030;
+  let guard = 0;
+  while (WISP.acc >= STEP && guard++ < 14) {
+    WISP.acc -= STEP;
+    /* lay each one at the distance along the segment it is actually owed */
+    const t = moved > 1e-6 ? Math.min(1, guard * STEP / moved) : 0;
+    spawn(WISP.lx + dx * t, WISP.ly + dy * t, ang, false);
+  }
+  /* the faintest breath when the hand is still, so the cursor keeps an aura */
+  WISP.idle += dt;
+  if (WISP.idle > .42) { WISP.idle = 0; spawn(WISP.ex, WISP.ey, Math.random() * TAU, true); }
+  WISP.lx = WISP.ex; WISP.ly = WISP.ey;
+
+  for (let i = 0; i < N; i++) {
+    const w = L[i], k = i * 3;
+    if (w.life >= w.max) { A[i] = 0; continue; }
+    w.life += dt;
+    const u = w.life / w.max;
+    P[k]     += (w.vx + Math.sin(clock * 1.3 + w.ph) * .17) * dt;
+    P[k + 1] += (w.vy + Math.cos(clock * 1.1 + w.ph * 1.7) * .14) * dt;
+    w.vx *= 1 - .5 * dt; w.vy = w.vy * (1 - .5 * dt) + .022 * dt;    /* it rises */
+    A[i] = smooth(0, .12, u) * (1 - smooth(.22, 1, u)) * .9;
+    S[i] = w.sz * (1 + u * .55);
+  }
+  g.attributes.position.needsUpdate = true;
+  g.attributes.aA.needsUpdate = true;
+  g.attributes.aS.needsUpdate = true;
+}
+
+/* ================================================== 7 · lighting the world */
+function buildLights() {
+  scene.add(new THREE.HemisphereLight(0x3d4552, 0x050507, .38));
+
+  const key = new THREE.DirectionalLight(0xcdd6e2, 1.05);
+  key.position.set(6, 24, 6);
+  key.target.position.set(0, 3, -18); scene.add(key.target);
+  if (WANT_SHADOW) {
+    key.castShadow = true;
+    const S = LOW ? 1024 : 2048;
+    key.shadow.mapSize.set(S, S);
+    const c = key.shadow.camera;
+    c.left = -30; c.right = 30; c.top = 40; c.bottom = -20; c.near = 3; c.far = 90;
+    key.shadow.bias = -0.0012; key.shadow.normalBias = .035; key.shadow.radius = 2.2;
+  }
+  scene.add(key); WORLD.key = key;
+
+  /* the core's own light — it is the only warm source in the world, and its
+     range reaches the monolith and the pylon lanes and nothing beyond */
+  const coreL = new THREE.PointLight(0xff2d1f, 3.1, 60, 2);
+  coreL.position.set(0, 8.5, -56); scene.add(coreL); WORLD.coreLight = coreL;
+
+  /* a cool wash over the lane so the pylons and the monolith never read as
+     pure black against the fog */
+  const laneL = new THREE.PointLight(0x9fb4c8, 1.5, 40, 2);
+  laneL.position.set(0, 9, -32); scene.add(laneL);
+
+  const fill = new THREE.PointLight(0x7fa0b8, 1.0, 34, 2);
+  fill.position.set(-6, 14, -6); scene.add(fill);
+
+  /* a low red breath under the pylon lane — barely there, but it stops the
+     ground between the pylons from going dead */
+  const under = new THREE.PointLight(0xff4530, 0.7, 30, 2);
+  under.position.set(0, 3.5, -26); scene.add(under);
+}
+/* ================================================== 8 · post-processing */
+const POST = { levels: [] };
+const QUAD_VS = 'varying vec2 vUv;\nvoid main(){ vUv = uv; gl_Position = vec4( position.xy, 0.0, 1.0 ); }';
+
+function initPost() {
+  POST.cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  POST.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), null);
+  POST.quad.frustumCulled = false;
+  POST.qScene = new THREE.Scene(); POST.qScene.add(POST.quad);
+  POST.up = new THREE.ShaderMaterial({
+    uniforms: { tS: { value: null }, uAmt: { value: 1 } }, vertexShader: QUAD_VS,
+    fragmentShader: 'uniform sampler2D tS; uniform float uAmt; varying vec2 vUv;\nvoid main(){ gl_FragColor = vec4(texture2D(tS,vUv).rgb*uAmt, 1.0); }',
+    blending: THREE.AdditiveBlending, transparent: true, depthTest: false, depthWrite: false
+  });
+  if (!WANT_POST) return;
+  const w = renderer.domElement.width, h = renderer.domElement.height;
+  const O = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, type: THREE.HalfFloatType, depthBuffer: false, stencilBuffer: false };
+  POST.scene = new THREE.WebGLRenderTarget(w, h, Object.assign({}, O, { depthBuffer: true, samples: LOW ? 0 : 2 }));
+  let lw = Math.max(2, w >> 1), lh = Math.max(2, h >> 1);
+  const N = 4;
+  for (let i = 0; i < N; i++) {
+    POST.levels.push({ a: new THREE.WebGLRenderTarget(lw, lh, O), b: new THREE.WebGLRenderTarget(lw, lh, O), w: lw, h: lh });
+    lw = Math.max(2, lw >> 1); lh = Math.max(2, lh >> 1);
+  }
+  POST.bright = new THREE.ShaderMaterial({
+    uniforms: { tS: { value: null }, uThr: { value: .86 }, uKnee: { value: .50 } },
+    vertexShader: QUAD_VS,
+    fragmentShader:
+      'uniform sampler2D tS; uniform float uThr; uniform float uKnee; varying vec2 vUv;\n' +
+      'void main(){ vec3 c = texture2D(tS, vUv).rgb;\n' +
+      ' float l = dot(c, vec3(0.2126,0.7152,0.0722));\n' +
+      ' float k = smoothstep(uThr, uThr+uKnee, l);\n' +
+      ' gl_FragColor = vec4(c*k, 1.0); }'
+  });
+  POST.blur = new THREE.ShaderMaterial({
+    uniforms: { tS: { value: null }, uDir: { value: new THREE.Vector2(1, 0) } },
+    vertexShader: QUAD_VS,
+    fragmentShader:
+      'uniform sampler2D tS; uniform vec2 uDir; varying vec2 vUv;\n' +
+      'void main(){ vec3 c = texture2D(tS, vUv).rgb * 0.2270270270;\n' +
+      ' c += texture2D(tS, vUv + uDir*1.3846153846).rgb * 0.3162162162;\n' +
+      ' c += texture2D(tS, vUv - uDir*1.3846153846).rgb * 0.3162162162;\n' +
+      ' c += texture2D(tS, vUv + uDir*3.2307692308).rgb * 0.0702702703;\n' +
+      ' c += texture2D(tS, vUv - uDir*3.2307692308).rgb * 0.0702702703;\n' +
+      ' gl_FragColor = vec4(c, 1.0); }'
+  });
+  POST.comp = new THREE.ShaderMaterial({
+    uniforms: {
+      tS: { value: null }, tB: { value: null }, uRes: { value: new THREE.Vector2(w, h) },
+      uT: { value: 0 }, uBloom: { value: .34 }, uCA: { value: 1 }, uGrain: { value: .020 },
+      uVig: { value: 1 }, uExp: { value: .62 }, uFade: { value: 1 }, uSat: { value: 1.05 }
+    },
+    vertexShader: QUAD_VS,
+    fragmentShader:
+      'uniform sampler2D tS; uniform sampler2D tB; uniform vec2 uRes;\n' +
+      'uniform float uT, uBloom, uCA, uGrain, uVig, uExp, uFade, uSat;\n' +
+      'varying vec2 vUv;\n' +
+      'vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14), 0.0, 1.0); }\n' +
+      'void main(){\n' +
+      ' vec2 d = vUv - 0.5; float r2 = dot(d,d);\n' +
+      ' float ca = uCA * (0.30 + r2*2.6) * 0.0013;\n' +
+      ' vec3 c;\n' +
+      ' c.r = texture2D(tS, vUv + d*ca).r;\n' +
+      ' c.g = texture2D(tS, vUv).g;\n' +
+      ' c.b = texture2D(tS, vUv - d*ca).b;\n' +
+      ' c += texture2D(tB, vUv).rgb * uBloom;\n' +
+      ' c *= uExp;\n' +
+      ' c = aces(c);\n' +
+      ' float l = dot(c, vec3(0.2126,0.7152,0.0722));\n' +
+      ' c = mix(vec3(l), c, uSat);\n' +
+      /* a whisper of cool in the shadows, warm only in the very top — the
+         grade keeps the blacks near-black instead of blue or brown */
+      ' c = mix(c, c*vec3(0.88,0.97,1.06), smoothstep(0.55,0.0,l)*0.35);\n' +
+      ' c = mix(c, c*vec3(1.02,0.995,0.975), smoothstep(0.50,1.0,l)*0.16);\n' +
+      ' float v = smoothstep(1.22, 0.26, length(d*vec2(1.0,0.94))*1.42);\n' +
+      ' c *= mix(1.0, v, uVig);\n' +
+      ' float g = fract(sin(dot(vUv*uRes + uT*137.0, vec2(12.9898,78.233)))*43758.5453);\n' +
+      ' c += (g-0.5)*uGrain;\n' +
+      ' c *= uFade;\n' +
+      ' vec3 e = pow(max(c,0.0), vec3(1.0/2.2));\n' +
+      /* A touch of contrast, applied after the encode rather than before it:
+         in linear the same curve mostly crushes the shadows, and this frame is
+         nearly all shadow. Pivoted low, at 0.30, so it deepens the night
+         without pulling the lit seams and the wordmark down with it. */
+      ' e = clamp((e - 0.30) * 1.00 + 0.30, 0.0, 1.0);\n' +
+      ' gl_FragColor = vec4( e, 1.0 );\n' +
+      '}'
+  });
+}
+function pass(mat, target, additive) {
+  POST.quad.material = mat;
+  renderer.setRenderTarget(target || null);
+  if (!additive) renderer.clear(true, false, false);
+  renderer.render(POST.qScene, POST.cam);
+}
+function renderPost() {
+  const L = POST.levels;
+  POST.bright.uniforms.tS.value = POST.scene.texture;
+  pass(POST.bright, L[0].a);
+  for (let i = 0; i < L.length; i++) {
+    if (i > 0) { POST.up.blending = THREE.NoBlending; POST.up.uniforms.uAmt.value = 1; POST.up.uniforms.tS.value = L[i - 1].a; pass(POST.up, L[i].a); }
+    POST.blur.uniforms.tS.value = L[i].a; POST.blur.uniforms.uDir.value.set(1 / L[i].w, 0); pass(POST.blur, L[i].b);
+    POST.blur.uniforms.tS.value = L[i].b; POST.blur.uniforms.uDir.value.set(0, 1 / L[i].h); pass(POST.blur, L[i].a);
+  }
+  POST.up.blending = THREE.AdditiveBlending; POST.up.uniforms.uAmt.value = .52;
+  for (let i = L.length - 1; i > 0; i--) { POST.up.uniforms.tS.value = L[i].a; pass(POST.up, L[i - 1].a, true); }
+  POST.comp.uniforms.tS.value = POST.scene.texture;
+  POST.comp.uniforms.tB.value = L[0].a;
+  pass(POST.comp, null);
+}
+
+/* ================================================= 9 · the camera rig */
+const CAM = [
+  { p: [  0.0, 3.60,  13.2 ], t: [  0.0,  7.4, -16.0 ], fov: 36 },  /* 0 intro        */
+  { p: [ -6.4, 2.60,  10.6 ], t: [  1.4,  7.0, -14.0 ], fov: 46 },  /* 1 about        */
+  { p: [  1.6, 3.30,   1.6 ], t: [ -0.8,  8.6, -26.0 ], fov: 41 },  /* 2 skills       */
+  { p: [  4.8, 2.40,  -5.6 ], t: [ -2.2,  8.2, -30.0 ], fov: 45 },  /* 3 projects     */
+  { p: [  0.0, 7.00, -15.6 ], t: [  0.0, 11.5, -42.0 ], fov: 40 },  /* 4 journey      */
+  { p: [  0.0, 10.8, -21.5 ], t: [  0.0,  4.6, -36.0 ], fov: 45 }   /* 5 contact      */
+];
+const RIG = { prog: 0, smooth: 0, mx: 0, my: 0, tmx: 0, tmy: 0, intro: 0, focus: -1, focusAmt: 0 };
+let curveP, curveT, tmpCam;
+
+function buildRig() {
+  curveP = new THREE.CatmullRomCurve3(CAM.map(c => new THREE.Vector3(c.p[0], c.p[1], c.p[2])), false, 'catmullrom', .42);
+  curveT = new THREE.CatmullRomCurve3(CAM.map(c => new THREE.Vector3(c.t[0], c.t[1], c.t[2])), false, 'catmullrom', .42);
+  tmpCam = new THREE.PerspectiveCamera(CAM[0].fov, vpW() / vpH(), .35, 220);
+  camera.layers.enable(1); camera.layers.enable(2);
+}
+const _p = new THREE.Vector3(), _t = new THREE.Vector3(), _d = new THREE.Vector3();
+/* Every waypoint is composed for a wide frame. On a tall one the same
+   numbers crop the world in half, so the rig steps back along its own view
+   axis and opens up a little instead of letting the sides fall away. */
+function aspectFix() { return clamp((1.62 - vpW() / vpH()) / 1.05, 0, 1); }
+function fitAspect(p, t, fov) {
+  const nf = aspectFix();
+  if (nf <= 0) return fov;
+  _d.subVectors(p, t).normalize();
+  p.addScaledVector(_d, nf * 8.2);
+  p.y += nf * 1.1;
+  return fov * (1 + nf * .40);
+}
+function applyCamera() {
+  const N = CAM.length - 1;
+  const u = clamp(RIG.smooth / N, 0, 1);
+  curveP.getPoint(u, _p); curveT.getPoint(u, _t);
+  const i = clamp(Math.floor(RIG.smooth), 0, N - 1), f = clamp(RIG.smooth - i, 0, 1);
+  let fov = lerp(CAM[i].fov, CAM[i + 1].fov, f);
+
+  fov = fitAspect(_p, _t, fov);
+
+  /* the opening dolly: a long lens easing in from further back */
+  const io = 1 - RIG.intro;
+  _p.z += io * 5.6; _p.y += io * 0.65; fov += io * 8;
+
+  /* parallax — a hand-held drift, never enough to break the frame */
+  const par = 1 - smooth(0, 1.6, RIG.smooth) * .55;
+  _p.x += RIG.mx * 0.62 * par; _p.y += RIG.my * 0.34 * par;
+  _t.x -= RIG.mx * 0.20 * par; _t.y -= RIG.my * 0.12 * par;
+
+  camera.position.copy(_p);
+  camera.lookAt(_t);
+  if (Math.abs(camera.fov - fov) > 1e-4) { camera.fov = fov; camera.updateProjectionMatrix(); }
+}
+
+/* ============================================== 10 · scroll ↔ chapters */
+const SECS = [].slice.call(document.querySelectorAll('[data-cam]'));
+let anchors = [], maxScroll = 1, activeSec = 0;
+function measure() {
+  maxScroll = Math.max(1, document.documentElement.scrollHeight - vpH());
+  anchors = SECS.map((el, i) => {
+    if (i === 0) return 0;
+    if (i === SECS.length - 1) return maxScroll;
+    return clamp(el.offsetTop + el.offsetHeight * .5 - vpH() * .5, 0, maxScroll);
+  });
+  for (let i = 1; i < anchors.length; i++) anchors[i] = Math.max(anchors[i], anchors[i - 1] + 1);
+}
+function progressFor(y) {
+  if (y <= anchors[0]) return 0;
+  for (let i = 0; i < anchors.length - 1; i++)
+    if (y <= anchors[i + 1]) return i + (y - anchors[i]) / (anchors[i + 1] - anchors[i]);
+  return anchors.length - 1;
+}
+
+/* ============================================ 11 · the wordmark layout */
+function layoutWord() {
+  if (!WORD.group) return;
+  const c = CAM[0];
+  const hp = new THREE.Vector3(c.p[0], c.p[1], c.p[2]);
+  const ht = new THREE.Vector3(c.t[0], c.t[1], c.t[2]);
+  tmpCam.fov = fitAspect(hp, ht, c.fov);
+  tmpCam.aspect = vpW() / vpH();
+  tmpCam.position.copy(hp);
+  tmpCam.lookAt(ht);
+  tmpCam.updateProjectionMatrix(); tmpCam.updateMatrixWorld(true);
+  const hit = (nx, ny) => {
+    const v = new THREE.Vector3(nx, ny, .5).unproject(tmpCam).sub(tmpCam.position).normalize();
+    return tmpCam.position.clone().addScaledVector(v, (WORD_Z - tmpCam.position.z) / v.z);
+  };
+  const L = hit(-1, 0), R = hit(1, 0);
+  /* Judge the frame by its shape, not its width. What forces the word up and
+     in is a *tall* frame, and a 768-wide tablet held upright is as tall as a
+     phone — on a width test it took the desktop baseline and sat below the
+     fold with only the top of the R showing. */
+  const narrow = vpW() / vpH() < 1.05;
+  /* Five wide-tracked glyphs nearly reach the frame edge — but not exactly:
+     the rig's mouse parallax can shift the camera a third of a unit either
+     way, and a zero-margin word gets its outer stems cut the moment the hand
+     strays. The inset below is wider than that drift. On a phone frame there
+     is no gutter at all, so the narrow branch holds a little further in. */
+  const fill = narrow ? .88 : .92;
+  const s = (R.x - L.x) * fill / WORD.ink.w;
+  /* on a tall frame the near sheets sit near mid-height, so the baseline has
+     to ride above them or the whole word disappears into the structures */
+  const base = hit(0, narrow ? -.16 : -.585);
+  WORD.group.scale.setScalar(s);
+  WORD.group.position.set(-WORD.ink.cx * s, base.y, WORD_Z);
+  WORD.rise = WORD.ink.asc * s * 1.25;
+}
+
+/* =================================================== 12 · page wiring */
+const $  = s => document.querySelector(s);
+const $$ = s => [].slice.call(document.querySelectorAll(s));
+const nav = $('#nav'), preEl = $('#pre'), preFill = $('#pre-fill'), prePct = $('#pre-pct');
+
+/* ---------------------------------------------------------------- content
+   The document's lists are rendered from the data structures at the top of
+   the file — one source of truth for every piece of portfolio content. */
+function el(html) { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; }
+function renderContent() {
+  const nl = $('#navlinks');
+  NAV.forEach(n => nl.appendChild(el(
+    '<a class="nav-link" href="' + n.href + '" data-cursor><span>' + n.label + '</span>' +
+    '<span class="alt">' + n.short + '</span></a>')));
+
+  const chips = $('#chips');
+  CHAPTERS.forEach((c, i) => chips.appendChild(el(
+    '<div class="chip" data-chip="' + c.focus + '" data-rv="up" data-cursor>' +
+    '<span class="num">0' + (i + 1) + '</span>' +
+    '<span class="tx"><b>' + c.name + '</b><p>' + c.blurb + '</p></span></div>')));
+
+  const sl = $('#skills-list');
+  SKILLS.forEach((s, i) => sl.appendChild(el(
+    '<div class="skill" data-skill="' + i + '" data-cursor>' +
+    '<span class="k">' + String(i + 1).padStart(2, '0') + '</span>' +
+    '<h3>' + s.name + '</h3><p>' + s.tag + '</p>' +
+    '<span class="t">' + s.level + '</span><i class="bar"></i></div>')));
+
+  const pl = $('#proj-list');
+  PROJECTS.forEach((p, i) => {
+    pl.appendChild(el(
+    '<article class="proj" data-view="' + i + '" data-rv="up" data-cursor>' +
+      '<div class="proj-fr" data-frame></div>' +
+      '<div class="proj-info">' +
+        '<span class="proj-num">Project ' + p.num + '</span>' +
+        '<h3 class="display">' + p.name + '</h3>' +
+        '<p class="lead">' + p.desc + '</p>' +
+        '<div class="proj-stack">' + p.stack.map(s => '<i>' + s + '</i>').join('') + '</div>' +
+        (p.features && p.features.length
+          ? '<ul class="proj-feats">' + p.features.map(f => '<li>' + f + '</li>').join('') + '</ul>'
+          : '') +
+        '<a class="arrowlink" href="' + p.url + '" target="_blank" rel="noopener">View Project' +
+        '<span class="ar"><svg viewBox="0 0 14 14" fill="none"><path d="M3 11 11 3M5 3h6v6" stroke="#f5f5f5" stroke-width="1.3"/></svg></span></a>' +
+      '</div></article>'));
+  });
+
+  const tl = $('#timeline');
+  TIMELINE.forEach(t => tl.appendChild(el(
+    '<div class="tl-item' + (t.year === 'CURRENT' ? ' cur' : '') + '" data-rv="up">' +
+    '<span class="yr">' + t.year + '</span><p>' + t.label + '</p></div>')));
+
+  const cb = $('#contact-btns');
+  [['GitHub', PROFILE.links.github], ['LinkedIn', PROFILE.links.linkedin], ['Email', PROFILE.links.email]]
+    .forEach(l => cb.appendChild(el(
+      '<a class="cta" href="' + l[1] + '" target="_blank" rel="noopener" data-rv="fade" data-cursor>' +
+      '<i></i><span>' + l[0] + '</span></a>')));
+}
+
+function wireReveals() {
+  splitHeadingWords();
+  const groups = new Map();
+  const items = $$('[data-rv], .mask-line');
+  items.forEach(el2 => {
+    const key = el2.parentElement;
+    const arr = groups.get(key) || []; arr.push(el2); groups.set(key, arr);
+  });
+  groups.forEach(arr => arr.forEach((el2, i) => el2.dataset.rvd = i * 85));
+  const io = new IntersectionObserver(es => {
+    es.forEach(e => {
+      if (!e.isIntersecting) return;
+      io.unobserve(e.target);
+      const d = parseFloat(e.target.dataset.rvd || 0);
+      setTimeout(() => e.target.classList.add('rv-in'), REDUCE ? 0 : d);
+    });
+  }, { rootMargin: '0px 0px -10% 0px', threshold: .04 });
+  items.forEach(el2 => { if (!el2.closest('#hero')) io.observe(el2); });
+}
+
+/* Word-level masks let every display heading arrive at a human reading pace.
+   The original text remains the accessible label, while the visual words are
+   explicitly presentational. */
+function splitHeadingWords() {
+  if (REDUCE) return;
+  $$('h1.display, h2.display').forEach(heading => {
+    const lines = heading.querySelectorAll('.mask-line');
+    const targets = lines.length ? [].slice.call(lines) : [heading];
+    targets.forEach(target => {
+      if (target.dataset.wordReady === 'true') return;
+      const phrase = target.textContent.replace(/\s+/g, ' ').trim();
+      if (!phrase) return;
+      target.dataset.wordReady = 'true';
+      target.classList.add('word-reveal');
+      target.setAttribute('aria-label', phrase);
+      target.textContent = '';
+      phrase.split(' ').forEach((word, i) => {
+        if (i) target.appendChild(document.createTextNode(' '));
+        const mask = document.createElement('span');
+        const inner = document.createElement('span');
+        mask.className = 'word-mask'; mask.setAttribute('aria-hidden', 'true');
+        inner.className = 'word'; inner.textContent = word;
+        inner.style.setProperty('--word-delay', (i * 72) + 'ms');
+        mask.appendChild(inner); target.appendChild(mask);
+      });
+    });
+  });
+}
+
+/* ------------------------------------------------------ leaving the hero
+   Everything along the foot of the hero is spent the moment the walk starts.
+   Nothing is written until the scroll actually leaves zero, and everything is
+   handed back the moment it returns: these elements carry the page's own
+   entrance reveal, and an inline opacity set at rest would pre-empt it. */
+function wireHeroExit() {
+  const hero = $('#hero'); if (!hero) return;
+  /* at = where in the exit it starts, span = how long it takes to go */
+  const seq = [
+    { el: $('.hero-cue'),  at: .10, span: .30, shift: true },
+    ...$$('.chip').map((el2, i) => ({ el: el2, at: .20 + i * .10, span: .30, shift: true })),
+    { el: $('.chapters'),  at: .60, span: .30 },  /* shifting it carries the chips twice */
+    { el: $('.hero-side'), at: .70, span: .30 }   /* its transform is the placement */
+  ].filter(o => o.el);
+  let on = false;
+  const apply = () => {
+    const t = clamp(scrollY / Math.max(1, vpH() * .58), 0, 1);
+    if (t <= 0) {
+      if (!on) return;
+      seq.forEach(o => {
+        o.el.style.opacity = ''; o.el.style.transform = ''; o.el.style.filter = '';
+        o.el.style.pointerEvents = ''; o.el.style.transition = '';
+      });
+      on = false; return;
+    }
+    on = true;
+    seq.forEach(o => {
+      /* these carry the reveal's own .9s opacity transition, which would
+         animate every value written here — the fade would then trail the
+         scroll by most of a second and stop reading as scroll-driven */
+      o.el.style.transition = 'none';
+      const a = 1 - smooth(o.at, o.at + o.span, t);
+      o.el.style.opacity = a.toFixed(3);
+      if (o.shift) o.el.style.transform = 'translate3d(0,' + ((1 - a) * 15).toFixed(1) + 'px,0)';
+      if (o.blur) o.el.style.filter = a > .999 ? '' : 'blur(' + ((1 - a) * o.blur).toFixed(1) + 'px)';
+      o.el.style.pointerEvents = a < .05 ? 'none' : '';
+    });
+  };
+  addEventListener('scroll', apply, { passive: true });
+  addEventListener('resize', apply, { passive: true });
+  apply();
+}
+
+function wireNav() {
+  let last = 0;
+  const rail = $('#rail');
+  SECS.forEach((s, i) => {
+    const b = document.createElement('button');
+    b.innerHTML = '<i></i>'; b.title = NAV[i] ? NAV[i].short : '';
+    b.setAttribute('aria-label', NAV[i] ? NAV[i].short : 'section');
+    b.addEventListener('click', () => scrollTo({ top: anchors[i], behavior: REDUCE ? 'auto' : 'smooth' }));
+    rail.appendChild(b);
+  });
+  const dots = $$('#rail button');
+  const links = $$('.nav-link');
+  const burger = $('.nav-burger');
+  const closeMenu = () => {
+    nav.classList.remove('menu-open');
+    burger.classList.remove('active');
+    burger.setAttribute('aria-expanded', 'false');
+    document.documentElement.classList.remove('nav-open');
+  };
+  const setMenu = open => {
+    /* clear the scroll-hide before the sheet opens: leaving it set would ease
+       the bar back down on close, promoting it again under the outgoing sheet */
+    if (open) nav.classList.remove('hide');
+    nav.classList.toggle('menu-open', open);
+    burger.classList.toggle('active', open);
+    burger.setAttribute('aria-expanded', String(open));
+    document.documentElement.classList.toggle('nav-open', open);
+  };
+  burger.setAttribute('aria-controls', 'navlinks');
+  burger.setAttribute('aria-expanded', 'false');
+  burger.addEventListener('click', () => {
+    if (vpW() > 820) return;
+    setMenu(!nav.classList.contains('menu-open'));
+  });
+  links.forEach(link => link.addEventListener('click', closeMenu));
+  addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
+  addEventListener('resize', () => { if (vpW() > 820) closeMenu(); }, { passive:true });
+  /* Which chapter each link actually points at, read off its href. Reading
+     the destination cannot drift the way a positional rule does. */
+  const linkSec = links.map(l => SECS.indexOf(document.querySelector(l.getAttribute('href'))));
+  window.addEventListener('scroll', () => {
+    const y = scrollY;
+    nav.classList.toggle('stuck', y > 40);
+    /* and don't even mark it hidden while the menu is open, or the class lands
+       the moment the sheet closes and the bar blinks away under the thumb */
+    nav.classList.toggle('hide',
+      !nav.classList.contains('menu-open') && y > last + 4 && y > vpH() * .8);
+    last = y;
+    const a = Math.round(progressFor(y));
+    if (a !== activeSec) {
+      activeSec = a;
+      dots.forEach((d, i) => d.classList.toggle('on', i === a));
+      links.forEach((l, i) => l.classList.toggle('on', linkSec[i] === a));
+    }
+  }, { passive: true });
+  $$('a[href^="#"]').forEach(a => a.addEventListener('click', e => {
+    const t = document.querySelector(a.getAttribute('href'));
+    if (!t) return;
+    e.preventDefault();
+    scrollTo({ top: a.getAttribute('href') === '#top' ? 0 : t.offsetTop - 40, behavior: REDUCE ? 'auto' : 'smooth' });
+  }));
+}
+
+function wireFocus() {
+  const set = i => { RIG.focus = i; };
+  $$('[data-chip]').forEach(el2 => {
+    el2.addEventListener('mouseenter', () => { set(+el2.dataset.chip); $$('[data-chip]').forEach(o => o.classList.toggle('on', o === el2)); });
+    el2.addEventListener('mouseleave', () => { set(-1); el2.classList.remove('on'); });
+  });
+  /* a skill row lights its pylon; the world reads WORLD.skillHover */
+  $$('[data-skill]').forEach(el2 => {
+    el2.addEventListener('mouseenter', () => { WORLD.skillHover = +el2.dataset.skill; el2.classList.add('on'); });
+    el2.addEventListener('mouseleave', () => { WORLD.skillHover = -1; el2.classList.remove('on'); });
+  });
+}
+
+function wireCursor() {
+  const dot = $('#cursor');
+  if (COARSE) { dot.style.display = 'none'; return; }
+  let x = vpW() / 2, y = vpH() / 2, tx2 = x, ty = y;
+  addEventListener('pointermove', e => {
+    tx2 = e.clientX; ty = e.clientY;
+    RIG.tmx = (e.clientX / vpW()) * 2 - 1;
+    RIG.tmy = -((e.clientY / vpH()) * 2 - 1);
+  }, { passive: true });
+  $$('[data-cursor]').forEach(el2 => {
+    el2.addEventListener('mouseenter', () => dot.classList.add('act'));
+    el2.addEventListener('mouseleave', () => dot.classList.remove('act'));
+  });
+  (function tick() {
+    x = lerp(x, tx2, .18); y = lerp(y, ty, .18);
+    dot.style.transform = 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0)';
+    requestAnimationFrame(tick);
+  })();
+}
+
+function makeGrain() {
+  const S = 180, c = cvs(S, S), x = c.getContext('2d');
+  const im = x.createImageData(S, S), d = im.data, r = mulberry32(9);
+  for (let i = 0; i < S * S; i++) {
+    const v = 110 + r() * 90;
+    d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v; d[i * 4 + 3] = 255;
+  }
+  x.putImageData(im, 0, 0);
+  $('#grain').style.backgroundImage = 'url(' + c.toDataURL('image/png') + ')';
+}
+
+/* ============================================ 13 · the card viewports
+   Each project's live window: its own camera, its own render target, blitted
+   into the composite at the element's screen rect. Hover leans the camera
+   toward its subject — the environment changing is the interaction.       */
+const CARDS = [];
+function buildCards() {
+  const defs = [
+    { p: [-3.6, 2.20, -8.5], t: [2.0, 9.5, -42.0], fov: 42 },   /* filter bot    */
+    { p: [ 5.2, 3.40, -14.0 ], t: [-2.0, 8.0, -52.0], fov: 40 }, /* isblue        */
+    { p: [ 0.8, 2.00, -2.0 ], t: [-0.6, 7.6, -30.0], fov: 44 }   /* recsys        */
+  ];
+  $$('[data-view]').forEach(el2 => {
+    const d = defs[+el2.dataset.view]; if (!d) return;
+    const c = new THREE.PerspectiveCamera(d.fov, 16 / 10, .3, 200);
+    c.position.set(d.p[0], d.p[1], d.p[2]);
+    c.lookAt(d.t[0], d.t[1], d.t[2]);
+    c.layers.set(0);
+    c.userData = { home: c.position.clone(), look: new THREE.Vector3(d.t[0], d.t[1], d.t[2]), push: 0, want: 0 };
+    CARDS.push({ cam: c, el: el2.querySelector('[data-frame]') || el2, rect: null });
+    el2.addEventListener('mouseenter', () => c.userData.want = 1);
+    el2.addEventListener('mouseleave', () => c.userData.want = 0);
+  });
+}
+/* A render target keeps its own viewport/scissor — renderer.setScissor()
+   only ever reaches the default framebuffer, so the region has to be set on
+   whichever surface we are actually drawing into, and re-bound to take. */
+const _push = new THREE.Vector3();
+function setRegion(rt, x, y, w, h) {
+  if (rt) {
+    const pr = renderer.getPixelRatio();
+    rt.viewport.set(x * pr, y * pr, w * pr, h * pr);
+    rt.scissor.set(x * pr, y * pr, w * pr, h * pr);
+    rt.scissorTest = true;
+    renderer.setRenderTarget(rt);
+  } else {
+    renderer.setViewport(x, y, w, h);
+    renderer.setScissor(x, y, w, h);
+    renderer.setScissorTest(true);
+  }
+}
+function clearRegion(rt) {
+  if (rt) {
+    rt.viewport.set(0, 0, rt.width, rt.height);
+    rt.scissor.set(0, 0, rt.width, rt.height);
+    rt.scissorTest = false;
+    renderer.setRenderTarget(rt);
+  } else {
+    renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, vpW(), vpH());
+    renderer.setScissor(0, 0, vpW(), vpH());
+  }
+}
+function cardBuffer(C, w, h) {
+  const pr = Math.min(renderer.getPixelRatio(), 2);
+  const W = Math.max(8, Math.round(w * pr)), H = Math.max(8, Math.round(h * pr));
+  if (C.rt && C.rt.width === W && C.rt.height === H) return C.rt;
+  if (C.rt) C.rt.dispose();
+  C.rt = new THREE.WebGLRenderTarget(W, H, {
+    minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+    type: THREE.HalfFloatType, depthBuffer: true, stencilBuffer: false
+  });
+  C.dirty = true;
+  return C.rt;
+}
+function aimCard(C, aspect) {
+  const c = C.cam, u = c.userData;
+  c.aspect = aspect; c.updateProjectionMatrix();
+  _push.subVectors(u.look, u.home).normalize();
+  c.position.copy(u.home).addScaledVector(_push, u.push * .55);
+  c.lookAt(u.look);
+}
+/* Each viewport keeps its own buffer and only re-renders when it is moving
+   or when its slot in the refresh rota comes round — the views are static,
+   so paying for three scene traversals every frame buys nothing. */
+/* The blit lands in the composite at the element's screen rect, and the canvas
+   knows nothing about the DOM stacked over it — so a block the page has faded
+   goes on painting a live view into the frame with nothing around it. Cull on
+   the element's effective opacity, not just its rect. */
+function cardAlpha(el2) {
+  let a = 1;
+  for (let n = el2; n && n !== document.body; n = n.parentElement) {
+    const s = getComputedStyle(n);
+    if (s.display === 'none' || s.visibility === 'hidden') return 0;
+    a *= +s.opacity;
+    if (a < .001) return 0;
+  }
+  return a;
+}
+function renderCards(rt) {
+  if (!CARDS.length) return;
+  let drew = false;
+  for (let i = 0; i < CARDS.length; i++) {
+    const C = CARDS[i], r = C.el.getBoundingClientRect();
+    if (r.bottom < -40 || r.top > vpH() + 40 || r.width < 4) continue;
+    if (cardAlpha(C.el) < .995) continue;
+    if (!WANT_POST) {                              /* debug path: straight in */
+      setRegion(rt, r.left, vpH() - r.bottom, r.width, r.height);
+      renderer.clear(true, true, false);
+      aimCard(C, r.width / r.height);
+      renderer.render(scene, C.cam);
+      drew = true; continue;
+    }
+    const buf = cardBuffer(C, r.width, r.height);
+    const u = C.cam.userData;
+    if (C.dirty || Math.abs(u.push - u.want) > .002 || (FRAME + i * 7) % 24 === 0) {
+      aimCard(C, r.width / r.height);
+      renderer.setRenderTarget(buf);
+      renderer.clear(true, true, false);
+      renderer.render(scene, C.cam);
+      C.dirty = false;
+    }
+    setRegion(rt, r.left, vpH() - r.bottom, r.width, r.height);
+    POST.up.blending = THREE.NoBlending;
+    POST.up.uniforms.uAmt.value = 1;
+    POST.up.uniforms.tS.value = buf.texture;
+    pass(POST.up, rt);
+    drew = true;
+  }
+  if (drew) clearRegion(rt);
+}
+
+/* ==================================================== 14 · the machine */
+let running = false, tPrev = 0, clock = 0, fadeIn = 0;
+const INTRO = { t0: 0 };
+
+function resize() {
+  const w = vpW(), h = vpH();
+  document.documentElement.style.setProperty('--vw', w + 'px');
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, DPR_CAP) * PERF.scale);
+  renderer.setSize(w, h, true);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+  const pw = renderer.domElement.width, ph = renderer.domElement.height;
+  if (WANT_POST && POST.scene) {
+    POST.scene.setSize(pw, ph);
+    POST.comp.uniforms.uRes.value.set(pw, ph);
+    let lw = Math.max(2, pw >> 1), lh = Math.max(2, ph >> 1);
+    POST.levels.forEach(L => { L.a.setSize(lw, lh); L.b.setSize(lw, lh); L.w = lw; L.h = lh; lw = Math.max(2, lw >> 1); lh = Math.max(2, lh >> 1); });
+  }
+  /* multisampling is the first thing to go when the budget tightens */
+  if (POST.scene) {
+    const want = (!LOW && PERF.scale > .78) ? 2 : 0;
+    if (POST.scene.samples !== want) { POST.scene.samples = want; POST.scene.dispose(); }
+  }
+  CARDS.forEach(C => { C.dirty = true; });
+  if (WANT_SHADOW && WORLD.key) WORLD.key.shadow.needsUpdate = true;
+  if (WORLD.motes) WORLD.motes.mesh.material.uniforms.uSize.value = h * renderer.getPixelRatio() * .5;
+  if (WISP.mesh) WISP.mesh.material.uniforms.uPx.value = h * renderer.getPixelRatio();
+  layoutWord();
+  measure();
+}
+
+function updateWorld(dt) {
+  WORLD.uT.value = clock;
+
+  /* the focused chapter warms its subject: a chip hover breathes life into
+     the thing it points at */
+  RIG.focusAmt = damp(RIG.focusAmt, RIG.focus >= 0 ? 1 : 0, 5, dt);
+  const f = RIG.focusAmt, fz = RIG.focus;
+  const coreHot = (fz === 0 || fz === 3) ? 1 : .35;
+  if (WORLD.coreHalo) WORLD.coreHalo.material.opacity = .46 + f * .16 * coreHot + Math.sin(clock * .5) * .04;
+  if (WORLD.coreLight) WORLD.coreLight.intensity = 3.1 * (1 + f * .38 * coreHot) * (1 + Math.sin(clock * .47) * .05);
+  if (WORLD.monSeam) WORLD.monSeam.material.opacity = .88 + f * .12 * (fz === 1 ? 1 : .3);
+  /* the skill pylons: a hover ignites one, the systems scan breathes on all */
+  if (WORLD.pylonSeams) WORLD.pylonSeams.forEach((m, i) => {
+    const u = m.userData;
+    const target = WORLD.skillHover === i ? 1 : (fz === 2 ? .45 : 0);
+    u.a = damp(u.a, target, 6, dt);
+    m.opacity = .5 + u.a * .5;
+    m.color.copy(WORLD.seamCool).lerp(WORLD.seamHot, u.a);
+  });
+  /* tower beacons blink out of phase */
+  if (WORLD.beacons) WORLD.beacons.forEach(b => {
+    b.material.opacity = .34 + .30 * (Math.sin(clock * 1.7 + b.userData.ph) * .5 + .5);
+    b.quaternion.copy(camera.quaternion);
+  });
+  /* the shards drift and turn, each on its own clock */
+  if (WORLD.shards) WORLD.shards.forEach(s => {
+    const u = s.userData;
+    s.position.y = u.y0 + Math.sin(clock * u.sp + u.ph) * .35;
+    s.rotation.y += dt * .12; s.rotation.x += dt * .05;
+  });
+  /* the core billboards; its ring turns slowly inside the billboard */
+  if (WORLD.core) {
+    WORLD.core.quaternion.copy(camera.quaternion);
+    if (WORLD.coreRing) WORLD.coreRing.rotation.z += dt * .06;
+  }
+
+  /* haze slides across the lane */
+  if (WORLD.haze) WORLD.haze.forEach(h => {
+    h.position.x = h.userData.x0 + Math.sin(clock * h.userData.sp + h.userData.ph) * 5.5;
+    h.quaternion.copy(camera.quaternion);
+  });
+
+  /* the type rises from behind the near sheet, then dissolves as you close on it */
+  if (WORD.group) {
+    const near = smooth(0.02, 0.92, RIG.smooth);
+    WORD.glyphs.forEach((g, i) => {
+      const st = clamp((WORD.reveal - i * .075) / .62, 0, 1);
+      const e = easeOut(st);
+      g.position.y = g.userData.baseY - (1 - e) * (WORD.ink.asc * 1.15);
+      g.material.opacity = e * (1 - near * .96);
+      g.visible = g.material.opacity > .004;
+    });
+  }
+  /* the cut-out layers dissolve as the camera reaches them, so the path can
+     walk straight through the structures instead of steering around them */
+  if (WORLD.fg) WORLD.fg.forEach(m => {
+    const a = smooth(.9, 4.6, camera.position.z - m.position.z);
+    m.material.opacity = a;
+    m.visible = a > .006;
+  });
+  updateMotes(dt);
+  updateWisps(dt);
+  /* the grid breathes a little brighter as the world closes */
+  if (WORLD.gridMat) WORLD.gridMat.emissiveIntensity = .62 + smooth(4.3, 5, RIG.smooth) * .22;
+  if (CARDS.length) CARDS.forEach(C => { const u = C.cam.userData; u.push = damp(u.push, u.want, 3.4, dt); });
+}
+
+let FRAME = 0;
+function render() {
+  FRAME++;
+  renderer.setRenderTarget(WANT_POST ? POST.scene : null);
+  renderer.clear(true, true, false);
+  renderer.render(scene, camera);
+  renderCards(WANT_POST ? POST.scene : null);
+  renderer.setRenderTarget(null);
+  if (WANT_POST) {
+    POST.comp.uniforms.uT.value = clock;
+    POST.comp.uniforms.uFade.value = fadeIn;
+    renderPost();
+  }
+}
+
+function frame(now) {
+  if (!running) return;
+  const raw = (now - tPrev) / 1000 || 0;
+  const dt = Math.min(raw, .05);              /* animation never jumps … */
+  tPrev = now; clock += dt;
+  fadeIn = INTRO.t0 ? sat((now - INTRO.t0) / 700) : 1;
+
+  if (!PERF.locked && clock > 2.2) {
+    PERF.acc += raw; PERF.n++;      /* … but the governor reads the truth */
+    if (PERF.n >= 40 || PERF.acc > .9) {
+      const avg = PERF.acc / PERF.n; PERF.acc = 0; PERF.n = 0;
+      if (avg > .0230 && PERF.scale > .55) { PERF.scale = Math.max(.55, PERF.scale * (avg > .05 ? .64 : .85)); resize(); }
+      else if (avg < .0138 && PERF.scale < 1) { PERF.scale = Math.min(1, PERF.scale + .08); resize(); }
+    }
+  }
+  RIG.prog = progressFor(scrollY);
+  RIG.smooth = REDUCE ? RIG.prog : damp(RIG.smooth, RIG.prog, 5.2, dt);
+  RIG.mx = damp(RIG.mx, RIG.tmx, 2.6, dt);
+  RIG.my = damp(RIG.my, RIG.tmy, 2.6, dt);
+  if (INTRO.t0) {
+    const el = (now - INTRO.t0) / 1000;
+    RIG.intro = sat(el / 2.4);
+    WORD.reveal = Math.min(1.2, el / 1.5);
+  }
+
+  applyCamera();
+  updateWorld(dt);
+  render();
+  queue();
+}
+const TIMER = qs('driver', 'raf') === 'timer';
+function queue() { TIMER ? setTimeout(() => frame(performance.now()), 16) : requestAnimationFrame(frame); }
+
+/* ======================================================== 15 · booting */
+const JOBS = [
+  ['Waking the canvas', () => document.fonts && Promise.all([
+    document.fonts.load('400 320px Onest'),
+    document.fonts.load('300 16px Onest')
+  ])],
+  ['Pouring the ground', () => { initGL(); WORLD.uT = { value: 0 }; buildRig(); buildLights(); }],
+  ['Laying the grid', () => buildShell()],
+  ['Igniting the core', () => buildCore()],
+  ['Raising the monolith', () => buildMonolith()],
+  ['Deploying the pylons', () => buildPylons()],
+  ['Placing the artifacts', () => buildArtifacts()],
+  ['Framing the horizon', () => buildForeground()],
+  ['Cutting the word', () => buildWordmark()],
+  ['Seeding the particles', () => { buildAtmosphere(); buildMotes(); buildWisps(); }],
+  ['Polishing the glass', () => {
+    initPost(); buildCards();
+    WORLD.fg.forEach(m => m.layers.set(1));
+    WORD.glyphs.forEach(m => m.layers.set(2));
+    if (WORLD.motes) WORLD.motes.mesh.layers.set(1);
+    layoutWord(); measure();
+    /* nothing that casts a shadow ever moves, so bake it once */
+    if (WANT_SHADOW && WORLD.key) { WORLD.key.shadow.autoUpdate = false; WORLD.key.shadow.needsUpdate = true; }
+  }]
+];
+
+function boot() {
+  renderContent();
+  makeGrain();
+  wireReveals(); wireNav(); wireHeroExit(); wireFocus(); wireCursor();
+  document.body.classList.add('is-locked');
+  let i = 0;
+  const step = () => {
+    const j = JOBS[i];
+    const done = () => {
+      i++;
+      const p = i / JOBS.length;
+      preFill.style.right = ((1 - p) * 100).toFixed(1) + '%';
+      prePct.textContent = Math.round(p * 100);
+      if (i < JOBS.length) setTimeout(step, 16); else setTimeout(start, 220);
+    };
+    let r;
+    try { r = j[1](); }
+    catch (err) {
+      console.error('[razer] job "' + j[0] + '" failed', err);
+      if (i <= 1) return fallback(err);          /* no renderer, no world */
+    }
+    (r && r.then) ? r.then(done, done) : done();
+  };
+  setTimeout(step, 60);
+}
+
+function fallback(err) {
+  document.documentElement.classList.add('no-webgl');
+  document.body.classList.add('no-webgl');
+  document.body.classList.remove('is-locked');
+  preEl.classList.add('done');
+  $$('[data-rv], .mask-line').forEach(e => e.classList.add('rv-in'));
+  window.__razer = { fallback: true, error: String(err && err.message || err) };
+}
+
+function start() {
+  addEventListener('resize', () => { resize(); }, { passive: true });
+  addEventListener('orientationchange', () => setTimeout(resize, 250));
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { running = false; }
+    else if (!running) { running = true; tPrev = performance.now(); queue(); }
+  });
+  resize();
+
+  const shot = Q.get('shot');
+  if (shot !== null) {                       /* deterministic states for review */
+    RIG.intro = 1; WORD.reveal = 1.2; fadeIn = 1; INTRO.t0 = 0;
+    const n = clamp(parseInt(shot, 10) || 0, 0, SECS.length - 1);
+    scrollTo(0, anchors[n]);
+    RIG.smooth = RIG.prog = progressFor(anchors[n]);
+    $$('[data-rv], .mask-line').forEach(e => e.classList.add('rv-in'));
+    document.body.classList.remove('is-locked');
+    preEl.classList.add('done');
+  } else {
+    preEl.classList.add('done');
+    setTimeout(() => {
+      document.body.classList.remove('is-locked');
+      $('#hero').querySelectorAll('[data-rv], .mask-line').forEach((e, i) =>
+        setTimeout(() => e.classList.add('rv-in'), REDUCE ? 0 : 120 + i * 95));
+    }, REDUCE ? 0 : 340);
+  }
+  running = true; tPrev = performance.now();
+  INTRO.t0 = shot !== null ? 0 : (REDUCE ? performance.now() - 4000 : performance.now());
+  queue();
+  window.__razer = { RIG: RIG, WORLD: WORLD, WORD: WORD, CAM: CAM, POST: POST, renderer: renderer, scene: scene, camera: camera, anchors: () => anchors };
+}
+
+if (document.readyState === 'complete' || document.readyState === 'interactive') setTimeout(boot, 0);
+else addEventListener('DOMContentLoaded', boot);
+})();
+</script>
+</body>
+</html>

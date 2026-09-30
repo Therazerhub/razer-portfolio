@@ -1,0 +1,22 @@
+/* The Kage document is a complete full-page experience: it owns its own
+   typography, palette, scroll behaviour and background. The frame hosting it
+   fills the viewport and hands the surface over untouched. */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #080808;
+}
+
+/* LandingPageFrame sizes itself to its parent (its iframe is absolutely
+   positioned), so the configured .shader-frame wrapper owns the height. The
+   Kage document is authored as a complete full-viewport page that scrolls
+   inside its frame. */
+.shader-frame {
+  height: 100vh;
+  height: 100dvh;
+}
